@@ -30,6 +30,7 @@ import ManagerReceipts from "./pages/ManagerReceipts";
 import ManagerSuppliers from "./pages/ManagerSuppliers";
 import ManagerPurchaseOrders from "./pages/ManagerPurchaseOrders";
 import ManagerFollowUps from "./pages/ManagerFollowUps";
+import ManagerAutomations from "./pages/ManagerAutomations";
 import SalesMyLeads from "./pages/SalesMyLeads";
 import SalesFollowUps from "./pages/SalesFollowUps";
 import SalesPipeline from "./pages/SalesPipeline";
@@ -84,6 +85,7 @@ const App = () => (
           <Route path="/manager/suppliers" element={<ProtectedRoute><ManagerSuppliers /></ProtectedRoute>} />
           <Route path="/manager/purchase-orders" element={<ProtectedRoute><ManagerPurchaseOrders /></ProtectedRoute>} />
           <Route path="/manager/follow-ups" element={<ProtectedRoute><ManagerFollowUps /></ProtectedRoute>} />
+          <Route path="/manager/automations" element={<ProtectedRoute><ManagerAutomations /></ProtectedRoute>} />
           <Route path="/manager/sales" element={<ProtectedRoute><ManagerSales /></ProtectedRoute>} />
           <Route path="/manager/sales-performance" element={<ProtectedRoute><ManagerSalesPerformance /></ProtectedRoute>} />
           <Route path="/manager/team" element={<ProtectedRoute><ManagerTeam /></ProtectedRoute>} />

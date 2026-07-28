@@ -16,6 +16,7 @@ import {
   PieChart,
   Award,
   Phone,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ const getMenuItems = (role: "owner" | "manager" | "salesman") => {
     { icon: Target, label: "Leads Overview", path: "/manager/pipeline" },
     { icon: Target, label: "Leads", path: "/manager/leads" },
     { icon: TrendingUp, label: "Sales Performance", path: "/manager/sales-performance" },
+    { icon: Zap, label: "Automations", path: "/manager/automations" },
     { icon: Award, label: "Manage Users", path: "/manager/activity" },
   ];
 
