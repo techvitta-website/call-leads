@@ -3,6 +3,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -403,6 +404,37 @@ const ManagerActivity = () => {
                         <Trash2 className="w-4 h-4 text-red-600" />
                       </Button>
                     </div>
+                  </div>
+
+                  {/* Auto-assignment eligibility */}
+                  <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-slate-700">Receives new leads</div>
+                      <div className="text-xs text-slate-500">
+                        {salesman.receives_leads === false
+                          ? "Skipped by auto-assignment"
+                          : "Eligible for auto-assignment"}
+                      </div>
+                    </div>
+                    <Switch
+                      checked={salesman.receives_leads !== false}
+                      onCheckedChange={async (next) => {
+                        // Optimistic: flip locally, roll back if the write fails.
+                        setSalesmen((prev: any[]) =>
+                          prev.map((s) => (s.id === salesman.id ? { ...s, receives_leads: next } : s))
+                        );
+                        const { error } = await supabase
+                          .from("users")
+                          .update({ receives_leads: next })
+                          .eq("id", salesman.id);
+                        if (error) {
+                          setSalesmen((prev: any[]) =>
+                            prev.map((s) => (s.id === salesman.id ? { ...s, receives_leads: !next } : s))
+                          );
+                          alert(`Could not update: ${error.message}`);
+                        }
+                      }}
+                    />
                   </div>
                 </div>
               ))}

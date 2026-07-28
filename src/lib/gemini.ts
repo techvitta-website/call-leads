@@ -1,123 +1,65 @@
 // Gemini AI service
-// Requires VITE_GEMINI_API_KEY in .env (local) and in Vercel env vars (production)
+//
+// The API key is NOT held in the browser. All calls go through the
+// `gemini-proxy` Supabase edge function, which reads the key from Vault
+// server-side. That means the key never appears in the JavaScript bundle
+// and only signed-in CRM users can spend quota.
+//
+// To rotate the key, run this as a manager or owner:
+//   select public.rotate_gemini_key('YOUR_NEW_KEY');
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-
-// Google renames/retires model IDs fairly often. Instead of hard-coding one ID
-// (which silently 404s and looks like "AI is broken"), we try a list in order
-// and remember the first one that works for the rest of the session.
-const MODEL_CANDIDATES = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-flash-latest",
-  "gemini-2.0-flash-001",
-  "gemini-1.5-flash",
-];
-
-let workingModel: string | null = null;
-
-const endpoint = (model: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-
-export const hasGeminiKey = () => Boolean(GEMINI_API_KEY);
+import { supabase } from "./supabase";
 
 /**
- * Low-level Gemini call with automatic model fallback and JSON-mode output.
- * Returns the raw text of the first candidate.
+ * The key lives server-side now, so the browser can't check it directly.
+ * Kept for call sites that want to short-circuit before showing an AI
+ * dialog; a missing key surfaces as a clear error from the proxy instead.
+ */
+export const hasGeminiKey = () => true;
+
+/**
+ * Low-level Gemini call. Model fallback, JSON mode and error handling all
+ * happen server-side. Returns the raw text of the first candidate.
  */
 export async function callGemini(
   prompt: string,
   opts: { temperature?: number; maxOutputTokens?: number; json?: boolean } = {}
 ): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error(
-      "Gemini API key is not configured. Add VITE_GEMINI_API_KEY to your .env file (local) and to your Vercel Environment Variables (production), then redeploy."
-    );
-  }
-
-  const body = JSON.stringify({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: {
+  const { data, error } = await supabase.functions.invoke("gemini-proxy", {
+    body: {
+      prompt,
       temperature: opts.temperature ?? 0.8,
       maxOutputTokens: opts.maxOutputTokens ?? 8192,
-      ...(opts.json === false ? {} : { responseMimeType: "application/json" }),
+      json: opts.json !== false,
     },
   });
 
-  const tryOrder = workingModel
-    ? [workingModel, ...MODEL_CANDIDATES.filter((m) => m !== workingModel)]
-    : MODEL_CANDIDATES;
-
-  let lastError = "";
-
-  for (const model of tryOrder) {
-    let response: Response;
+  // supabase-js wraps non-2xx responses in a FunctionsHttpError whose body
+  // holds our own message. Dig it out so the user sees something useful
+  // rather than "Edge Function returned a non-2xx status code".
+  if (error) {
+    let detail = "";
     try {
-      response = await fetch(endpoint(model), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-goog-api-key": GEMINI_API_KEY,
-        },
-        body,
-      });
-    } catch (networkErr: any) {
-      throw new Error(
-        `Could not reach the Gemini API (${networkErr?.message || "network error"}). Check your internet connection.`
-      );
+      const ctx = (error as any)?.context;
+      if (ctx && typeof ctx.json === "function") {
+        const parsed = await ctx.json();
+        detail = parsed?.error || "";
+      }
+    } catch {
+      /* fall through to the generic message */
     }
-
-    if (response.ok) {
-      workingModel = model;
-      const data = await response.json();
-
-      const blockReason = data?.promptFeedback?.blockReason;
-      if (blockReason) {
-        throw new Error(
-          `Gemini blocked this request (${blockReason}). Try rephrasing your targeting criteria.`
-        );
-      }
-
-      const text = (data?.candidates?.[0]?.content?.parts || [])
-        .map((p: any) => p?.text || "")
-        .join("")
-        .trim();
-
-      if (!text) {
-        const finish = data?.candidates?.[0]?.finishReason;
-        throw new Error(
-          finish === "MAX_TOKENS"
-            ? "Gemini hit the output limit. Try generating fewer leads at a time."
-            : "Gemini returned an empty response. Please try again."
-        );
-      }
-      return text;
-    }
-
-    const errText = await response.text();
-    lastError = `${response.status}: ${errText.slice(0, 400)}`;
-
-    // 404 / "model not found" → try the next candidate. Anything else is fatal.
-    const modelMissing =
-      response.status === 404 ||
-      /not found|not supported|unsupported model/i.test(errText);
-
-    if (!modelMissing) {
-      if (response.status === 401 || response.status === 403) {
-        throw new Error(
-          "Gemini rejected the API key (401/403). Check that VITE_GEMINI_API_KEY is correct and that the Generative Language API is enabled for it."
-        );
-      }
-      if (response.status === 429) {
-        throw new Error(
-          "Gemini rate limit reached. Wait a minute and try again, or generate fewer leads."
-        );
-      }
-      throw new Error(`Gemini API error ${lastError}`);
-    }
+    throw new Error(
+      detail ||
+        (error as any)?.message ||
+        "The AI service is unavailable right now. Please try again."
+    );
   }
 
-  throw new Error(`No available Gemini model responded. Last error — ${lastError}`);
+  const text = (data as any)?.text;
+  if (!text) {
+    throw new Error((data as any)?.error || "Gemini returned an empty response. Please try again.");
+  }
+  return text as string;
 }
 
 /** Strip markdown fences and parse a JSON array out of a model response. */

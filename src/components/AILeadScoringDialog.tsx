@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Target, CheckCircle, AlertCircle } from "lucide-react";
 
-import { callGemini, hasGeminiKey } from "@/lib/gemini";
+import { callGemini } from "@/lib/gemini";
 
 interface Lead {
   id: string;
@@ -91,12 +91,8 @@ export default function AILeadScoringDialog({
   };
 
   const scoreLeads = async () => {
-    if (!hasGeminiKey()) {
-      setError(
-        "Gemini API key not configured. Add VITE_GEMINI_API_KEY to your .env file and to your Vercel environment variables."
-      );
-      return;
-    }
+    // The key lives server-side now; a missing one surfaces as a clear
+    // error from the proxy rather than something we can check up front.
 
     setStep("scoring");
     setError(null);
@@ -227,11 +223,10 @@ JSON array only, starting with [ and ending with ]`;
                 </div>
               </div>
               <ul className="text-sm text-slate-600 space-y-1 pl-1">
-                <li>• Industry fit for blockchain ERP (manufacturing, logistics, finance)</li>
+                <li>• How strong a commercial buyer the industry looks (+10 to +25)</li>
                 <li>• Company name quality and specificity</li>
-                <li>• Contact completeness (email +10, phone +10)</li>
+                <li>• Contact completeness (email +10, phone +10, industry +8)</li>
                 <li>• Priority level (urgent +20, high +10, low -10)</li>
-                <li>• Blockchain ERP software category (+15)</li>
               </ul>
             </div>
             <DialogFooter>
