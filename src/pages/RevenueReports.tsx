@@ -127,7 +127,7 @@ const RevenueReports = () => {
           const quota = MONTHLY_TARGET * 6;
           return {
             id: user.id,
-            name: user.name || user.full_name || user.email || "Unknown",
+            name: user.full_name || user.name || user.email || "Unknown",
             revenue,
             deals: won.length,
             quota,

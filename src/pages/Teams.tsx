@@ -161,12 +161,12 @@ const Teams = () => {
                             <div className="flex items-center gap-3 mb-3">
                               <Avatar className="w-10 h-10">
                                 <AvatarFallback className="bg-blue-600/30 text-blue-300 font-medium">
-                                  {initials(member.name || member.email)}
+                                  {initials(member.full_name || member.name || member.email)}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0 flex-1">
                                 <div className="text-sm font-medium text-white truncate">
-                                  {member.name || member.email}
+                                  {member.full_name || member.name || member.email}
                                 </div>
                                 <Badge
                                   variant="outline"
@@ -230,12 +230,12 @@ const Teams = () => {
                 >
                   <Avatar className="w-8 h-8">
                     <AvatarFallback className="bg-amber-500/20 text-amber-400 text-xs">
-                      {initials(u.name || u.email)}
+                      {initials(u.full_name || u.name || u.email)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
                     <div className="text-sm text-white truncate">
-                      {u.name || u.email}
+                      {u.full_name || u.name || u.email}
                     </div>
                     <div className="text-xs text-slate-400 truncate">{u.email}</div>
                   </div>
