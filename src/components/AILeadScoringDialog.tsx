@@ -10,9 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Target, CheckCircle, AlertCircle } from "lucide-react";
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-latest:generateContent";
+import { callGemini, hasGeminiKey } from "@/lib/gemini";
 
 interface Lead {
   id: string;
@@ -93,8 +91,10 @@ export default function AILeadScoringDialog({
   };
 
   const scoreLeads = async () => {
-    if (!GEMINI_API_KEY) {
-      setError("Gemini API key not configured. Add VITE_GEMINI_API_KEY to your .env file.");
+    if (!hasGeminiKey()) {
+      setError(
+        "Gemini API key not configured. Add VITE_GEMINI_API_KEY to your .env file and to your Vercel environment variables."
+      );
       return;
     }
 
@@ -114,15 +114,13 @@ export default function AILeadScoringDialog({
       software_category: l.software_category || "",
     }));
 
-    const prompt = `You are an expert B2B sales scoring engine for a blockchain ERP company selling to manufacturing, logistics, and finance sectors.
+    const prompt = `You are an expert B2B sales scoring engine. Rank how likely each lead is to convert.
 
 Score each lead from 1 to 100 based on these rules:
-- Industry fit for blockchain ERP: manufacturing/logistics/finance = +20 to +30 points; other industries = +5 to +15 points
+- Data completeness: non-empty email = +10, non-empty phone = +10, known industry = +8
 - Company name quality: specific meaningful names = +10, generic/vague names = +0 to +5
-- Has a non-empty email = +10 points
-- Has a non-empty phone = +10 points
 - Priority: urgent = +20, high = +10, medium = 0, low = -10
-- Software category is "blockchain_erp" = +15 points
+- Industry looks like a strong commercial buyer (established sector, has budget) = +10 to +25
 - Base score starts at 40
 
 Leads to score:
@@ -136,31 +134,12 @@ Return ONLY a valid JSON array (no markdown, no explanation). Each element must 
 JSON array only, starting with [ and ending with ]`;
 
     try {
-      const response = await fetch(GEMINI_API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-goog-api-key": GEMINI_API_KEY,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 8192,
-            responseMimeType: "application/json",
-          },
-        }),
+      const rawText = await callGemini(prompt, {
+        temperature: 0.2,
+        maxOutputTokens: 8192,
       });
 
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
       const jsonStr = rawText
         .replace(/^```json\s*/i, "")

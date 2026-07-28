@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,163 +19,375 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader, Sparkles, Bot, CheckCircle2, AlertCircle, Building2, User, Mail, Phone, MapPin, Zap, FileCheck, Link } from "lucide-react";
+import {
+  Loader,
+  Sparkles,
+  Bot,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Zap,
+  Briefcase,
+  Globe,
+  TrendingUp,
+} from "lucide-react";
 import { generateLeadsWithAI, AIGeneratedLead } from "@/lib/gemini";
-import { createBulkLeads } from "@/lib/supabase";
+import { createBulkLeads, supabase } from "@/lib/supabase";
+
+interface ProjectLike {
+  id: string;
+  name: string;
+  description?: string | null;
+}
 
 interface AILeadGenerationDialogProps {
   open: boolean;
   onClose: () => void;
-  projectId: string;
+  /** All projects the user can pick from. */
+  projects: ProjectLike[];
+  /** Pre-selected project id (from the page filter), optional. */
+  defaultProjectId?: string;
+  /** Existing leads — used to avoid generating duplicates. */
+  existingLeads?: any[];
+  /** Sales users the new leads can be assigned to. */
+  salesUsers?: any[];
   onLeadsImported: () => void;
 }
 
 const INDUSTRIES = [
+  "Any / Mixed",
   "Manufacturing",
   "Retail & E-Commerce",
-  "Healthcare & Pharma",
+  "Healthcare & Hospitals",
+  "Pharma & Life Sciences",
+  "Dermatology & Aesthetic Clinics",
   "Logistics & Supply Chain",
   "Construction & Real Estate",
-  "Agriculture & Food Processing",
+  "Agriculture & Agri-Tech",
+  "Food Processing",
   "Finance & Banking",
-  "Education",
-  "IT & Technology",
+  "Insurance",
+  "Education & EdTech",
+  "IT & Technology Services",
+  "Staffing & Recruitment",
   "Hospitality & Tourism",
   "Automotive",
+  "Aviation & Drones",
   "Textiles & Apparel",
   "Chemical & Petrochemical",
   "Energy & Utilities",
+  "Mining",
+  "Telecom",
+  "Government & PSU",
 ];
 
 const REGIONS = [
   "India",
   "South India",
   "North India",
-  "Maharashtra",
-  "Gujarat",
-  "Tamil Nadu",
+  "West India",
+  "East India",
   "Telangana & Andhra Pradesh",
   "Karnataka",
+  "Tamil Nadu",
+  "Maharashtra",
+  "Gujarat",
+  "Delhi NCR",
+  "Kerala",
   "Middle East (UAE, Saudi Arabia)",
   "Southeast Asia",
   "United States",
   "United Kingdom",
   "Europe",
+  "Australia & New Zealand",
+  "Africa",
 ];
 
-const PRODUCT_FIT_COLORS: Record<string, string> = {
-  "TrustDoc.in": "bg-blue-100 text-blue-800 border-blue-200",
-  ChainTrack: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  Both: "bg-purple-100 text-purple-800 border-purple-200",
+const ROLE_OPTIONS = [
+  "Founder / CEO",
+  "Managing Director",
+  "CTO / Head of Technology",
+  "COO / Head of Operations",
+  "CFO / Finance Head",
+  "HR Director / CHRO",
+  "Head of Sales",
+  "Head of Marketing",
+  "Procurement / Purchase Manager",
+  "Supply Chain Director",
+  "Plant / Factory Manager",
+  "IT Manager",
+  "Compliance Officer",
+  "Clinic Owner / Practice Manager",
+  "Doctor / Consultant",
+  "Business Owner / Proprietor",
+];
+
+const COMPANY_SIZES = [
+  "Any size",
+  "Micro (1–10 employees)",
+  "Small (10–50 employees)",
+  "SME (50–200 employees)",
+  "Mid-Market (200–1000 employees)",
+  "Enterprise (1000+ employees)",
+];
+
+/**
+ * The leads table stores `industry` as one of a fixed set of slugs, and the
+ * page's industry filter matches on those exactly. Map whatever the user picked
+ * (and whatever free text Gemini returns) onto a slug so AI-generated leads are
+ * still findable via that filter. The AI's specific sub-industry is preserved
+ * verbatim in lead_notes.
+ */
+const INDUSTRY_SLUGS: Array<[RegExp, string]> = [
+  [/manufactur|textile|apparel|chemical|petrochem|automotive|mining/i, "manufacturing"],
+  [/retail|e-?commerce|ecommerce/i, "retail"],
+  [/health|hospital|pharma|clinic|derma|medical|life science/i, "healthcare"],
+  [/educat|edtech|school|college|university/i, "education"],
+  [/construct|infrastructure/i, "construction"],
+  [/logistic|supply chain|transport|shipping|freight|aviation|drone/i, "logistics"],
+  [/hospitality|tourism|hotel|restaurant|travel/i, "hospitality"],
+  [/financ|bank|insurance|fintech|lending/i, "finance"],
+  [/\bit\b|technolog|software|saas|telecom|staffing|recruit/i, "it"],
+  [/real estate|realty|property/i, "real_estate"],
+  [/agricultur|agri|farming|food process/i, "agriculture"],
+];
+
+const toIndustrySlug = (...candidates: (string | undefined)[]): string => {
+  for (const text of candidates) {
+    if (!text) continue;
+    for (const [pattern, slug] of INDUSTRY_SLUGS) {
+      if (pattern.test(text)) return slug;
+    }
+  }
+  return "other";
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "bg-red-100 text-red-700",
-  high: "bg-orange-100 text-orange-700",
-  medium: "bg-yellow-100 text-yellow-700",
-  low: "bg-gray-100 text-gray-600",
+  urgent: "bg-red-100 text-red-700 border-red-200",
+  high: "bg-orange-100 text-orange-700 border-orange-200",
+  medium: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  low: "bg-gray-100 text-gray-600 border-gray-200",
+};
+
+/** Sensible starting brief when a project has no description saved yet. */
+const inferOffering = (projectName: string) => {
+  const n = (projectName || "").toLowerCase();
+  if (n.includes("hrms"))
+    return "HRMS — a cloud HR management platform covering employee records, attendance, payroll, leave management and performance reviews. Sold to HR heads and business owners who are still running HR on spreadsheets.";
+  if (n.includes("drone"))
+    return "Drone solutions — commercial drone hardware and services for agricultural spraying, land survey, mapping and industrial inspection, plus the software to manage fleets and flight data.";
+  if (n.includes("derma") || n.includes("clinic"))
+    return "Derma Clinic CRM — practice management software for dermatology and aesthetic clinics: appointment booking, patient records, treatment plans, before/after photo tracking, billing and automated follow-up reminders.";
+  if (n.includes("kanchii"))
+    return "Kanchii — describe the product and the buyer here so the AI can find the right prospects.";
+  return `${projectName} — describe what this project sells, who the ideal customer is, and the main problem it solves. The more specific you are, the better the generated leads.`;
 };
 
 export default function AILeadGenerationDialog({
   open,
   onClose,
-  projectId,
+  projects,
+  defaultProjectId,
+  existingLeads = [],
+  salesUsers = [],
   onLeadsImported,
 }: AILeadGenerationDialogProps) {
-  const [step, setStep] = useState<"configure" | "results" | "importing" | "done">("configure");
+  const [step, setStep] = useState<"configure" | "results" | "importing" | "done">(
+    "configure"
+  );
 
-  // Configuration
-  const [selectedProducts, setSelectedProducts] = useState<string[]>(["TrustDoc.in", "ChainTrack"]);
-  const [industry, setIndustry] = useState("Manufacturing");
+  // ── Targeting configuration ──────────────────────────────
+  const [projectId, setProjectId] = useState<string>(defaultProjectId || "");
+  const [offering, setOffering] = useState("");
+  const [industry, setIndustry] = useState("Any / Mixed");
   const [region, setRegion] = useState("India");
+  const [location, setLocation] = useState("");
+  const [companySize, setCompanySize] = useState("Any size");
+  const [roles, setRoles] = useState<string[]>([]);
+  const [keywords, setKeywords] = useState("");
+  const [dealSizeHint, setDealSizeHint] = useState("");
   const [count, setCount] = useState("10");
-  const [companySize, setCompanySize] = useState("SME to Enterprise");
+  const clampedCount = Math.min(Math.max(parseInt(count) || 10, 1), 30);
+  const [avoidDuplicates, setAvoidDuplicates] = useState(true);
+  const [assignTo, setAssignTo] = useState<string>("unassigned");
+  const [saveBrief, setSaveBrief] = useState(true);
 
-  // Results
+  // ── Results ──────────────────────────────────────────────
   const [generatedLeads, setGeneratedLeads] = useState<AIGeneratedLead[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importedCount, setImportedCount] = useState(0);
 
-  const toggleProduct = (product: string) => {
-    setSelectedProducts((prev) =>
-      prev.includes(product) ? prev.filter((p) => p !== product) : [...prev, product]
+  const selectedProject = useMemo(
+    () => projects.find((p) => p.id === projectId),
+    [projects, projectId]
+  );
+
+  // The dialog stays mounted, so re-sync to the page's project filter every
+  // time it opens — otherwise it would keep showing whichever project was
+  // chosen last time and silently import leads into the wrong one.
+  useEffect(() => {
+    if (!open) return;
+    const initial = defaultProjectId || (projects.length === 1 ? projects[0].id : "");
+    if (initial) setProjectId(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultProjectId]);
+
+  // Load the brief when the chosen project changes. Deliberately keyed on
+  // projectId alone so re-renders never wipe out what the user has typed.
+  const loadedBriefFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!projectId || loadedBriefFor.current === projectId) return;
+    const p = projects.find((x) => x.id === projectId);
+    if (!p) return;
+    loadedBriefFor.current = projectId;
+    setOffering(p.description?.trim() ? p.description : inferOffering(p.name));
+  }, [projectId, projects]);
+
+  // Companies already in this project — sent to the model as an exclusion list.
+  const existingCompanies = useMemo(() => {
+    if (!avoidDuplicates) return [];
+    return Array.from(
+      new Set(
+        existingLeads
+          .filter((l) => !projectId || l.project_id === projectId)
+          .map((l) => (l.company_name || "").trim())
+          .filter(Boolean)
+      )
     );
-  };
+  }, [existingLeads, projectId, avoidDuplicates]);
+
+  const toggleRole = (role: string) =>
+    setRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+    );
 
   const handleGenerate = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Select at least one product.");
+    if (!projectId) {
+      setError("Choose which project these leads belong to.");
+      return;
+    }
+    if (offering.trim().length < 20) {
+      setError(
+        "Describe what this project sells in a bit more detail — the AI uses this to find matching companies."
+      );
       return;
     }
     setError(null);
     setGenerating(true);
     try {
       const leads = await generateLeadsWithAI({
-        products: selectedProducts,
-        industry,
+        offering,
+        projectName: selectedProject?.name,
+        industry: industry === "Any / Mixed" ? "any relevant industry" : industry,
         region,
-        count: Math.min(Math.max(parseInt(count) || 10, 3), 25),
-        companySize,
+        location: location.trim() || undefined,
+        count: clampedCount,
+        companySize: companySize === "Any size" ? undefined : companySize,
+        roles,
+        keywords: keywords.trim() || undefined,
+        dealSizeHint: dealSizeHint.trim() || undefined,
+        excludeCompanies: existingCompanies,
       });
+
+      if (leads.length === 0) {
+        setError("The AI returned no usable leads. Try broadening the filters.");
+        return;
+      }
+
+      // Persist the brief so the next run remembers it.
+      if (
+        saveBrief &&
+        selectedProject &&
+        offering.trim() !== (selectedProject.description || "").trim()
+      ) {
+        // Fire-and-forget: a failed brief save must not block the results.
+        supabase
+          .from("projects")
+          .update({ description: offering.trim() })
+          .eq("id", projectId)
+          .then(
+            () => {},
+            () => {}
+          );
+      }
+
       setGeneratedLeads(leads);
       setSelectedIds(new Set(leads.map((l) => l.id)));
       setStep("results");
     } catch (err: any) {
-      setError(err.message || "Failed to generate leads. Check your Gemini API key.");
+      setError(err?.message || "Failed to generate leads.");
     } finally {
       setGenerating(false);
     }
   };
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = (id: string) =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
 
-  const toggleAll = () => {
-    if (selectedIds.size === generatedLeads.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(generatedLeads.map((l) => l.id)));
-    }
-  };
+  const toggleAll = () =>
+    setSelectedIds((prev) =>
+      prev.size === generatedLeads.length
+        ? new Set()
+        : new Set(generatedLeads.map((l) => l.id))
+    );
 
   const handleImport = async () => {
     const toImport = generatedLeads.filter((l) => selectedIds.has(l.id));
     if (toImport.length === 0) return;
     setStep("importing");
+    setError(null);
 
     try {
       const leadsPayload = toImport.map((lead) => ({
         company_name: lead.company_name,
         contact_name: lead.contact_name,
-        designation: lead.designation,
-        email: lead.email,
-        phone: lead.phone,
-        city: lead.city,
-        country: lead.country,
-        description: lead.notes,
-        lead_notes: `Product Fit: ${lead.product_fit}\n\n${lead.notes}`,
+        designation: lead.designation || null,
+        email: lead.email || null,
+        phone: lead.phone || null,
+        city: lead.city || null,
+        state: lead.state || null,
+        country: lead.country || null,
+        linkedin: lead.linkedin || null,
+        value: lead.estimated_value || 0,
+        description:
+          lead.fit_reason || lead.notes || `AI generated for ${selectedProject?.name || "project"}`,
+        lead_notes: [
+          lead.fit_reason ? `Why they fit: ${lead.fit_reason}` : "",
+          lead.buying_signal ? `Buying signal: ${lead.buying_signal}` : "",
+          lead.company_size ? `Company size: ${lead.company_size}` : "",
+          lead.website ? `Website: ${lead.website}` : "",
+          lead.industry ? `Sub-industry: ${lead.industry}` : "",
+          lead.notes || "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
         lead_source: "AI Generated",
         data_source: "Gemini AI",
         priority: lead.priority,
-        software_category: "blockchain_erp",
-        industry: lead.industry,
+        industry: toIndustrySlug(lead.industry, industry === "Any / Mixed" ? undefined : industry),
         status: "new",
         project_id: projectId,
+        assigned_to: assignTo === "unassigned" ? null : assignTo,
       }));
 
-      await createBulkLeads(leadsPayload as any);
+      const res: any = await createBulkLeads(leadsPayload as any);
+      if (res?.error) throw new Error(res.error.message || "Import failed");
+
       setImportedCount(toImport.length);
       setStep("done");
       onLeadsImported();
     } catch (err: any) {
-      setError(err.message || "Import failed. Please try again.");
+      setError(err?.message || "Import failed. Please try again.");
       setStep("results");
     }
   };
@@ -189,8 +402,8 @@ export default function AILeadGenerationDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose(); }}>
+      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
@@ -199,129 +412,232 @@ export default function AILeadGenerationDialog({
             AI Lead Generation
           </DialogTitle>
           <DialogDescription>
-            Gemini AI generates targeted prospects for your blockchain ERP products
+            Gemini AI researches prospects that match your project's offering and filters
           </DialogDescription>
         </DialogHeader>
 
-        {/* ── CONFIGURE STEP ── */}
+        {/* ── CONFIGURE ── */}
         {step === "configure" && (
-          <div className="space-y-6 pt-2">
-            {/* Product Selection */}
-            <div>
-              <Label className="text-sm font-semibold text-slate-800 mb-3 block">
-                Select Products to Pitch
-              </Label>
+          <div className="space-y-5 pt-1">
+            {/* Project + brief */}
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  {
-                    id: "TrustDoc.in",
-                    name: "TrustDoc.in",
-                    icon: <FileCheck className="w-5 h-5 text-blue-600" />,
-                    desc: "Blockchain document verification & management",
-                    color: "border-blue-200 bg-blue-50",
-                    activeColor: "border-blue-500 bg-blue-100 ring-2 ring-blue-300",
-                  },
-                  {
-                    id: "ChainTrack",
-                    name: "ChainTrack",
-                    subtitle: "trustchainvault.com",
-                    icon: <Link className="w-5 h-5 text-emerald-600" />,
-                    desc: "Blockchain supply chain tracking",
-                    color: "border-emerald-200 bg-emerald-50",
-                    activeColor: "border-emerald-500 bg-emerald-100 ring-2 ring-emerald-300",
-                  },
-                ].map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => toggleProduct(product.id)}
-                    className={`relative text-left p-4 rounded-xl border-2 transition-all ${
-                      selectedProducts.includes(product.id)
-                        ? product.activeColor
-                        : product.color + " opacity-70 hover:opacity-100"
-                    }`}
-                  >
-                    {selectedProducts.includes(product.id) && (
-                      <CheckCircle2 className="absolute top-3 right-3 w-4 h-4 text-green-600" />
-                    )}
-                    <div className="flex items-center gap-2 mb-1">
-                      {product.icon}
-                      <span className="font-semibold text-slate-800">{product.name}</span>
-                      {product.subtitle && (
-                        <span className="text-xs text-slate-500">{product.subtitle}</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-600">{product.desc}</p>
-                  </button>
-                ))}
+                <div>
+                  <Label className="text-sm font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5" />
+                    Project *
+                  </Label>
+                  <Select value={projectId} onValueChange={setProjectId}>
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Choose a project…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold text-slate-800 mb-1.5 block">
+                    Assign generated leads to
+                  </Label>
+                  <Select value={assignTo} onValueChange={setAssignTo}>
+                    <SelectTrigger className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Leave unassigned</SelectItem>
+                      {salesUsers.map((u: any) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.full_name || u.name || u.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold text-slate-800 mb-1.5 block">
+                  What this project sells (the AI targets against this) *
+                </Label>
+                <Textarea
+                  value={offering}
+                  onChange={(e) => setOffering(e.target.value)}
+                  rows={4}
+                  placeholder="e.g. HRMS — cloud HR platform for attendance, payroll and leave. Sold to HR heads at 50–500 person companies still using spreadsheets."
+                  className="bg-white text-sm resize-y"
+                />
+                <label className="flex items-center gap-2 mt-2 text-xs text-slate-600 cursor-pointer">
+                  <Checkbox
+                    checked={saveBrief}
+                    onCheckedChange={(v) => setSaveBrief(Boolean(v))}
+                  />
+                  Save this as the project brief so it's remembered next time
+                </label>
               </div>
             </div>
 
-            {/* Targeting */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">Target Industry</Label>
-                <Select value={industry} onValueChange={setIndustry}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INDUSTRIES.map((ind) => (
-                      <SelectItem key={ind} value={ind}>
-                        {ind}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Targeting filters */}
+            <div>
+              <Label className="text-sm font-semibold text-slate-800 mb-3 block">
+                Targeting filters
+              </Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                    Industry / vertical
+                  </Label>
+                  <Select value={industry} onValueChange={setIndustry}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {INDUSTRIES.map((ind) => (
+                        <SelectItem key={ind} value={ind}>
+                          {ind}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">Target Region</Label>
-                <Select value={region} onValueChange={setRegion}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REGIONS.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <div>
+                  <Label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                    Region
+                  </Label>
+                  <Select value={region} onValueChange={setRegion}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {REGIONS.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">Company Size</Label>
-                <Select value={companySize} onValueChange={setCompanySize}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Startups & SME (10–200 employees)">
-                      Startups & SME
-                    </SelectItem>
-                    <SelectItem value="Mid-Market (200–1000 employees)">
-                      Mid-Market
-                    </SelectItem>
-                    <SelectItem value="Enterprise (1000+ employees)">Enterprise</SelectItem>
-                    <SelectItem value="SME to Enterprise">All sizes</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                <div>
+                  <Label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5">
+                    <MapPin className="w-3 h-3" />
+                    Specific cities (optional)
+                  </Label>
+                  <Input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Hyderabad, Bengaluru, Pune"
+                  />
+                </div>
 
+                <div>
+                  <Label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                    Company size
+                  </Label>
+                  <Select value={companySize} onValueChange={setCompanySize}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMPANY_SIZES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                    Buying signals / must-have criteria (optional)
+                  </Label>
+                  <Input
+                    value={keywords}
+                    onChange={(e) => setKeywords(e.target.value)}
+                    placeholder="expanding, hiring, no HR software yet"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5">
+                    <TrendingUp className="w-3 h-3" />
+                    Typical deal size (optional)
+                  </Label>
+                  <Input
+                    value={dealSizeHint}
+                    onChange={(e) => setDealSizeHint(e.target.value)}
+                    placeholder="₹1L – ₹5L per year"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Decision makers */}
+            <div>
+              <Label className="text-sm font-semibold text-slate-800 mb-2 block">
+                Decision makers to target{" "}
+                <span className="font-normal text-xs text-slate-500">
+                  ({roles.length === 0 ? "AI picks the best fit" : `${roles.length} selected`})
+                </span>
+              </Label>
+              <div className="flex flex-wrap gap-1.5">
+                {ROLE_OPTIONS.map((role) => {
+                  const active = roles.includes(role);
+                  return (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => toggleRole(role)}
+                      className={`px-2.5 py-1 rounded-full text-xs border transition-all ${
+                        active
+                          ? "bg-violet-600 text-white border-violet-600"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-700"
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Count + dedupe */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
               <div>
-                <Label className="text-sm font-medium mb-1.5 block">
-                  Number of Leads (max 25)
+                <Label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                  Number of leads (1–30)
                 </Label>
                 <Input
                   type="number"
-                  min={3}
-                  max={25}
+                  min={1}
+                  max={30}
                   value={count}
                   onChange={(e) => setCount(e.target.value)}
                   className="h-10"
                 />
               </div>
+              <label className="flex items-start gap-2 text-xs text-slate-600 cursor-pointer pb-2">
+                <Checkbox
+                  checked={avoidDuplicates}
+                  onCheckedChange={(v) => setAvoidDuplicates(Boolean(v))}
+                  className="mt-0.5"
+                />
+                <span>
+                  Skip companies already in this project
+                  {existingCompanies.length > 0 && (
+                    <span className="text-slate-400">
+                      {" "}
+                      ({Math.min(existingCompanies.length, 120)} excluded)
+                    </span>
+                  )}
+                </span>
+              </label>
             </div>
 
             {error && (
@@ -331,24 +647,24 @@ export default function AILeadGenerationDialog({
               </div>
             )}
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 pt-1">
               <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
               <Button
                 onClick={handleGenerate}
-                disabled={generating || selectedProducts.length === 0}
+                disabled={generating || !projectId}
                 className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white gap-2"
               >
                 {generating ? (
                   <>
                     <Loader className="w-4 h-4 animate-spin" />
-                    Generating with Gemini AI…
+                    Researching prospects…
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    Generate {count} Leads
+                    Generate {clampedCount} Leads
                   </>
                 )}
               </Button>
@@ -356,16 +672,16 @@ export default function AILeadGenerationDialog({
           </div>
         )}
 
-        {/* ── RESULTS STEP ── */}
+        {/* ── RESULTS ── */}
         {step === "results" && (
           <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <Bot className="w-5 h-5 text-violet-600" />
-                <span className="font-semibold text-slate-800">
-                  {generatedLeads.length} leads generated for{" "}
-                  <span className="text-violet-700">{industry}</span> in{" "}
-                  <span className="text-violet-700">{region}</span>
+                <span className="font-semibold text-slate-800 text-sm">
+                  {generatedLeads.length} leads for{" "}
+                  <span className="text-violet-700">{selectedProject?.name}</span> ·{" "}
+                  {industry} · {region}
                 </span>
               </div>
               <Badge variant="outline" className="text-xs">
@@ -380,22 +696,20 @@ export default function AILeadGenerationDialog({
               </div>
             )}
 
-            {/* Select all */}
             <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
               <Checkbox
                 checked={selectedIds.size === generatedLeads.length}
                 onCheckedChange={toggleAll}
-                id="select-all"
+                id="ai-select-all"
               />
               <label
-                htmlFor="select-all"
+                htmlFor="ai-select-all"
                 className="text-sm text-slate-600 cursor-pointer select-none"
               >
                 Select all
               </label>
             </div>
 
-            {/* Lead cards */}
             <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
               {generatedLeads.map((lead) => (
                 <div
@@ -415,47 +729,70 @@ export default function AILeadGenerationDialog({
                       className="mt-1 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <span className="font-semibold text-slate-900 flex items-center gap-1">
                           <Building2 className="w-3.5 h-3.5 text-slate-500" />
                           {lead.company_name}
                         </span>
                         <Badge
-                          className={`text-xs border ${PRODUCT_FIT_COLORS[lead.product_fit] || "bg-gray-100 text-gray-600 border-gray-200"}`}
-                        >
-                          {lead.product_fit}
-                        </Badge>
-                        <Badge
-                          className={`text-xs ${PRIORITY_COLORS[lead.priority] || "bg-gray-100 text-gray-600"}`}
+                          className={`text-xs border ${PRIORITY_COLORS[lead.priority] || PRIORITY_COLORS.medium}`}
                         >
                           {lead.priority}
                         </Badge>
+                        {lead.company_size && (
+                          <Badge variant="outline" className="text-xs text-slate-600">
+                            {lead.company_size}
+                          </Badge>
+                        )}
+                        {!!lead.estimated_value && (
+                          <Badge variant="outline" className="text-xs text-emerald-700 border-emerald-200">
+                            ~₹{Number(lead.estimated_value).toLocaleString("en-IN")}
+                          </Badge>
+                        )}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs text-slate-600 mb-2">
-                        <span className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600 mb-2">
+                        <span className="flex items-center gap-1 truncate">
+                          <User className="w-3 h-3 shrink-0" />
                           {lead.contact_name} · {lead.designation}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
+                        <span className="flex items-center gap-1 truncate">
+                          <Mail className="w-3 h-3 shrink-0" />
                           {lead.email}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
+                        <span className="flex items-center gap-1 truncate">
+                          <Phone className="w-3 h-3 shrink-0" />
                           {lead.phone}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {lead.city}, {lead.country}
+                        <span className="flex items-center gap-1 truncate">
+                          <MapPin className="w-3 h-3 shrink-0" />
+                          {[lead.city, lead.state, lead.country].filter(Boolean).join(", ")}
                         </span>
-                        <span className="flex items-center gap-1 col-span-2">
-                          <Zap className="w-3 h-3 text-amber-500" />
+                        <span className="flex items-center gap-1 truncate">
+                          <Zap className="w-3 h-3 text-amber-500 shrink-0" />
                           {lead.industry}
                         </span>
+                        {lead.website && (
+                          <span className="flex items-center gap-1 truncate">
+                            <Globe className="w-3 h-3 shrink-0" />
+                            {lead.website}
+                          </span>
+                        )}
                       </div>
 
-                      <p className="text-xs text-slate-500 leading-relaxed">{lead.notes}</p>
+                      {lead.fit_reason && (
+                        <p className="text-xs text-violet-800 bg-violet-100/60 rounded px-2 py-1 mb-1">
+                          <span className="font-medium">Why they fit:</span> {lead.fit_reason}
+                        </p>
+                      )}
+                      {lead.buying_signal && (
+                        <p className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 mb-1">
+                          <span className="font-medium">Signal:</span> {lead.buying_signal}
+                        </p>
+                      )}
+                      {lead.notes && (
+                        <p className="text-xs text-slate-500 leading-relaxed">{lead.notes}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -463,12 +800,8 @@ export default function AILeadGenerationDialog({
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-3 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setStep("configure")}
-              >
-                ← Regenerate
+              <Button variant="outline" size="sm" onClick={() => setStep("configure")}>
+                ← Change filters
               </Button>
               <Button
                 onClick={handleImport}
@@ -476,24 +809,26 @@ export default function AILeadGenerationDialog({
                 className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white gap-2"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                Import {selectedIds.size} Selected Lead{selectedIds.size !== 1 ? "s" : ""}
+                Import {selectedIds.size} Lead{selectedIds.size !== 1 ? "s" : ""}
               </Button>
             </div>
           </div>
         )}
 
-        {/* ── IMPORTING STEP ── */}
+        {/* ── IMPORTING ── */}
         {step === "importing" && (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
             <div className="w-14 h-14 rounded-full bg-violet-100 flex items-center justify-center">
               <Loader className="w-7 h-7 text-violet-600 animate-spin" />
             </div>
-            <p className="text-slate-700 font-medium">Importing leads to your pipeline…</p>
-            <p className="text-xs text-slate-500">Creating {selectedIds.size} leads in Supabase</p>
+            <p className="text-slate-700 font-medium">Adding leads to your pipeline…</p>
+            <p className="text-xs text-slate-500">
+              Creating {selectedIds.size} leads in {selectedProject?.name}
+            </p>
           </div>
         )}
 
-        {/* ── DONE STEP ── */}
+        {/* ── DONE ── */}
         {step === "done" && (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
@@ -501,11 +836,12 @@ export default function AILeadGenerationDialog({
             </div>
             <div className="text-center">
               <p className="text-lg font-semibold text-slate-900 mb-1">
-                {importedCount} Leads Imported!
+                {importedCount} Leads Imported
               </p>
               <p className="text-sm text-slate-500">
-                Your blockchain ERP leads are now in the pipeline, tagged as{" "}
-                <span className="font-medium text-violet-700">Blockchain ERP · AI Generated</span>
+                Added to{" "}
+                <span className="font-medium text-violet-700">{selectedProject?.name}</span>,
+                tagged as <span className="font-medium">AI Generated</span>
               </p>
             </div>
             <Button

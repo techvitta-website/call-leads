@@ -39,6 +39,57 @@ const parsePhoneNumbers = (phoneString: string | null | undefined): string[] => 
   return [...new Set(phones)]; // Remove duplicates
 };
 
+/**
+ * Single source of truth for a blank Add-Lead form.
+ * Both reset paths (Cancel and post-create) spread this, so adding a field
+ * here can never leave one of them stale.
+ */
+const EMPTY_LEAD_FORM = {
+  project_id: "",
+  company_name: "",
+  contact_name: "",
+  email: "",
+  phone: "",
+  value: "",
+  assigned_to: "",
+  status: "new" as "new" | "qualified" | "proposal" | "closed_won" | "not_interested",
+  description: "",
+  link: "",
+  designation: "",
+  mobile_phone: "",
+  direct_phone: "",
+  office_phone: "",
+  linkedin: "",
+  address_line1: "",
+  address_line2: "",
+  city: "",
+  state: "",
+  country: "",
+  zip: "",
+  customer_group: "",
+  product_group: "",
+  tags: "",
+  lead_source: "",
+  data_source: "",
+  lead_score: "",
+  next_followup_date: "",
+  followup_notes: "",
+  repeat_followup: false,
+  do_not_followup: false,
+  do_not_followup_reason: "",
+  lead_notes: "",
+  organization_notes: "",
+  date_of_birth: "",
+  special_event_date: "",
+  reference_url1: "",
+  reference_url2: "",
+  reference_url3: "",
+  list_name: "",
+  priority: "medium",
+  software_category: "",
+  industry: "",
+};
+
 const ManagerLeads = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -196,48 +247,7 @@ const ManagerLeads = () => {
         setEditing(false);
       }
     };
-  const [leadForm, setLeadForm] = useState({
-    company_name: "",
-    contact_name: "",
-    email: "",
-    phone: "",
-    value: "",
-    assigned_to: "",
-    status: "new" as "new" | "qualified" | "proposal" | "closed_won" | "not_interested",
-    description: "",
-    link: "",
-    // New comprehensive fields
-    designation: "",
-    mobile_phone: "",
-    direct_phone: "",
-    office_phone: "",
-    linkedin: "",
-    address_line1: "",
-    address_line2: "",
-    city: "",
-    state: "",
-    country: "",
-    zip: "",
-    customer_group: "",
-    product_group: "",
-    tags: "",
-    lead_source: "",
-    data_source: "",
-    lead_score: "",
-    next_followup_date: "",
-    followup_notes: "",
-    repeat_followup: false,
-    do_not_followup: false,
-    do_not_followup_reason: "",
-    lead_notes: "",
-    organization_notes: "",
-    date_of_birth: "",
-    special_event_date: "",
-    reference_url1: "",
-    reference_url2: "",
-    reference_url3: "",
-    list_name: "",
-  });
+  const [leadForm, setLeadForm] = useState({ ...EMPTY_LEAD_FORM });
   const [creating, setCreating] = useState(false);
   const [createMessage, setCreateMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [assigningLead, setAssigningLead] = useState<string | null>(null);
@@ -417,8 +427,9 @@ const ManagerLeads = () => {
       setCreateMessage({ type: "error", text: "Company, contact, and value are required." });
       return;
     }
-    if (!selectedProject) {
-      setCreateMessage({ type: "error", text: "Please select a project first." });
+    const targetProjectId = (leadForm as any).project_id || selectedProject?.id;
+    if (!targetProjectId) {
+      setCreateMessage({ type: "error", text: "Please choose a project for this lead." });
       return;
     }
     const valueNum = Number(leadForm.value);
@@ -436,7 +447,7 @@ const ManagerLeads = () => {
         status: leadForm.status,
         value: valueNum,
         assigned_to: leadForm.assigned_to || null,
-        project_id: selectedProject.id,
+        project_id: targetProjectId,
         description: leadForm.description || `Created on ${new Date().toLocaleDateString()}`,
         link: leadForm.link || undefined,
         // New comprehensive fields
@@ -480,7 +491,7 @@ const ManagerLeads = () => {
       setLeads(leadsRes.data || []);
       setTimeout(() => {
         setShowAddLeadModal(false);
-        setLeadForm({ company_name: "", contact_name: "", email: "", phone: "", value: "", assigned_to: "", status: "new", description: "", link: "" });
+        setLeadForm({ ...EMPTY_LEAD_FORM });
         setCreateMessage(null);
       }, 1500);
     } catch (err: any) {
@@ -1350,9 +1361,14 @@ const ManagerLeads = () => {
       leadSoftwareCategory === softwareCategoryFilter.toLowerCase();
 
     // Industry filter
+    // Match loosely: legacy/imported leads may hold free text ("Automotive
+    // Manufacturing") rather than the slug the filter uses ("manufacturing").
     const leadIndustry = String((lead as any).industry || "").toLowerCase();
+    const wanted = String(industryFilter || "").toLowerCase();
     const matchesIndustry = industryFilter === "all" || !industryFilter ||
-      leadIndustry === industryFilter.toLowerCase();
+      leadIndustry === wanted ||
+      leadIndustry.includes(wanted.replace(/_/g, " ")) ||
+      leadIndustry.replace(/[\s_]/g, "").includes(wanted.replace(/[\s_]/g, ""));
 
     // Location filters
     const matchesCountry = !countryFilter || ((lead as any).country || "").toLowerCase().includes(countryFilter.toLowerCase());
@@ -1897,10 +1913,17 @@ const ManagerLeads = () => {
 
               {/* ─ Add & Import ─ */}
               <Button
-                onClick={() => setShowAddLeadModal(true)}
-                disabled={!selectedProject}
+                onClick={() => {
+                  setCreateMessage(null);
+                  setLeadForm((f: any) => ({
+                    ...f,
+                    project_id: selectedProject?.id || (projects.length === 1 ? projects[0].id : ""),
+                  }));
+                  setShowAddLeadModal(true);
+                }}
+                disabled={projects.length === 0}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 shrink-0 whitespace-nowrap"
-                title={!selectedProject ? "Select a project to add a lead" : "Add a new lead"}
+                title={projects.length === 0 ? "Create a project first" : "Add a new lead"}
               >
                 <Plus className="w-4 h-4 mr-1.5" />
                 Add Lead
@@ -1937,9 +1960,9 @@ const ManagerLeads = () => {
               {/* ─ AI Tools ─ */}
               <Button
                 onClick={() => setShowAILeadDialog(true)}
-                disabled={!selectedProject}
+                disabled={projects.length === 0}
                 className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 shrink-0 whitespace-nowrap"
-                title={!selectedProject ? "Select a project first" : "Generate leads with Gemini AI"}
+                title={projects.length === 0 ? "Create a project first" : "Generate leads with Gemini AI"}
               >
                 <Sparkles className="w-4 h-4 mr-1.5" />
                 AI Generate
@@ -2850,6 +2873,22 @@ const ManagerLeads = () => {
                 
                 {/* Basic Information Tab */}
                 <TabsContent value="basic" className="space-y-4 mt-4">
+              <div className="mb-4">
+                <Label htmlFor="lead-project">Project *</Label>
+                <Select
+                  value={(leadForm as any).project_id || ""}
+                  onValueChange={(value) => setLeadForm({ ...leadForm, project_id: value } as any)}
+                >
+                  <SelectTrigger id="lead-project">
+                    <SelectValue placeholder="Choose which project this lead belongs to" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="company">Company Name *</Label>
@@ -3315,47 +3354,8 @@ const ManagerLeads = () => {
             <DialogFooter>
               <Button variant="outline" onClick={() => {
                 setShowAddLeadModal(false);
-                setLeadForm({
-                  company_name: "",
-                  contact_name: "",
-                  email: "",
-                  phone: "",
-                  value: "",
-                  assigned_to: "",
-                  status: "new",
-                  description: "",
-                  link: "",
-                  designation: "",
-                  mobile_phone: "",
-                  direct_phone: "",
-                  office_phone: "",
-                  linkedin: "",
-                  address_line1: "",
-                  address_line2: "",
-                  city: "",
-                  state: "",
-                  country: "",
-                  zip: "",
-                  customer_group: "",
-                  product_group: "",
-                  tags: "",
-                  lead_source: "",
-                  data_source: "",
-                  lead_score: "",
-                  next_followup_date: "",
-                  followup_notes: "",
-                  repeat_followup: false,
-                  do_not_followup: false,
-                  do_not_followup_reason: "",
-                  lead_notes: "",
-                  organization_notes: "",
-                  date_of_birth: "",
-                  special_event_date: "",
-                  reference_url1: "",
-                  reference_url2: "",
-                  reference_url3: "",
-                  list_name: "",
-                });
+                setLeadForm({ ...EMPTY_LEAD_FORM });
+                setCreateMessage(null);
               }} disabled={creating}>Cancel</Button>
               <Button onClick={handleCreateLead} disabled={creating}>
                 {creating ? "Creating..." : "Create Lead"}
@@ -4812,17 +4812,19 @@ const ManagerLeads = () => {
       </main>
 
       {/* AI Lead Generation Dialog */}
-      {selectedProject && (
-        <AILeadGenerationDialog
-          open={showAILeadDialog}
-          onClose={() => setShowAILeadDialog(false)}
-          projectId={selectedProject}
-          onLeadsImported={async () => {
-            const leadsRes = await import("@/lib/supabase").then(m => m.getLeads());
-            if (leadsRes?.data) setLeads(leadsRes.data as any[]);
-          }}
-        />
-      )}
+      <AILeadGenerationDialog
+        open={showAILeadDialog}
+        onClose={() => setShowAILeadDialog(false)}
+        projects={projects}
+        defaultProjectId={selectedProject?.id}
+        existingLeads={leads}
+        salesUsers={salesUsers}
+        onLeadsImported={async () => {
+          const leadsRes = await import("@/lib/supabase").then(m => m.getLeads());
+          if (leadsRes?.data) setLeads(leadsRes.data as any[]);
+        }}
+      />
+
 
       {/* AI Lead Scoring Dialog */}
       <AILeadScoringDialog

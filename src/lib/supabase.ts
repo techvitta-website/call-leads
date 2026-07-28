@@ -577,6 +577,10 @@ export const createBulkLeads = async (leads: Array<{
   reference_url2?: string | null;
   reference_url3?: string | null;
   list_name?: string | null;
+  priority?: string | null;
+  industry?: string | null;
+  software_category?: string | null;
+  status?: string | null;
 }>) => {
   try {
     const currentUser = await getCurrentUser();
@@ -707,7 +711,19 @@ export const createBulkLeads = async (leads: Array<{
       if (lead.list_name && String(lead.list_name).trim()) {
         leadData.list_name = String(lead.list_name).trim();
       }
-      
+      if (lead.priority && String(lead.priority).trim()) {
+        leadData.priority = String(lead.priority).trim();
+      }
+      if (lead.industry && String(lead.industry).trim()) {
+        leadData.industry = String(lead.industry).trim();
+      }
+      if (lead.software_category && String(lead.software_category).trim()) {
+        leadData.software_category = String(lead.software_category).trim();
+      }
+      if (lead.status && String(lead.status).trim()) {
+        leadData.status = String(lead.status).trim();
+      }
+
       return leadData;
     });
     
