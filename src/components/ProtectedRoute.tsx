@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Loader } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-type UserRole = "owner" | "manager" | "salesman";
-
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
@@ -18,12 +16,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          navigate("/login", { replace: true });
+          navigate("/", { replace: true });
           return;
         }
       } catch (error) {
         console.error("Error checking authentication:", error);
-        navigate("/login", { replace: true });
+        navigate("/", { replace: true });
       } finally {
         setIsLoading(false);
       }

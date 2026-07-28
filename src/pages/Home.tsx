@@ -24,8 +24,34 @@ const Home = () => {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
+  // Redirect already-logged-in users to their dashboard
   useEffect(() => {
-    setIsLoading(false);
+    const checkSession = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          if (userData?.role) {
+            const role = String(userData.role).toLowerCase();
+            const dashboardRoute: Record<string, string> = {
+              owner: '/owner',
+              manager: '/manager',
+              salesman: '/salesman',
+            };
+            navigate(dashboardRoute[role] || '/owner', { replace: true });
+          }
+        }
+      } catch {
+        // not logged in, stay on home
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    checkSession();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -392,39 +418,11 @@ const Home = () => {
                 </Button>
               </form>
 
-              {/* Toggle between Sign In and Sign Up */}
+              {/* Account creation is managed by admins — no self-registration */}
               <div className="mt-6 text-center">
-                {!isSignUp && (
-                  <>
-                    <p className="text-slate-600 mb-4">Don't have an account?</p>
-                    <button
-                      onClick={() => {
-                        setIsSignUp(true);
-                        setError("");
-                        setSuccessMessage("");
-                      }}
-                      className="text-slate-900 hover:text-slate-700 font-medium"
-                    >
-                      Sign up here
-                    </button>
-                  </>
-                )}
-                {isSignUp && (
-                  <>
-                    <p className="text-slate-600 mb-4">Already have an account?</p>
-                    <button
-                      onClick={() => {
-                        setIsSignUp(false);
-                        setError("");
-                        setSuccessMessage("");
-                        setFullName("");
-                      }}
-                      className="text-slate-900 hover:text-slate-700 font-medium"
-                    >
-                      Sign in here
-                    </button>
-                  </>
-                )}
+                <p className="text-slate-500 text-sm">
+                  Need access? Contact your team administrator.
+                </p>
               </div>
             </div>
           </div>

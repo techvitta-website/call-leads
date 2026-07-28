@@ -43,6 +43,7 @@ import Regions from "./pages/Regions";
 import RevenueReports from "./pages/RevenueReports";
 import NotFound from "./pages/NotFound";
 import WhoAmI from "./pages/WhoAmI";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -53,49 +54,58 @@ const App = () => (
       <Sonner />
       <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <Routes>
+          {/* Public route — login/landing page */}
           <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/owner" element={<OwnerDashboard />} />
-          <Route path="/manager" element={<ManagerDashboard />} />
-          <Route path="/whoami" element={<WhoAmI />} />
-          <Route path="/salesman" element={<SalesmanDashboard />} />
-          <Route path="/manager/leads" element={<ManagerLeads />} />
-          <Route path="/manager/deal-stages" element={<ManagerDealStages />} />
-          <Route path="/manager/won-deals" element={<ManagerWonDeals />} />
-          <Route path="/manager/lost-deals" element={<ManagerLostDeals />} />
-          <Route path="/manager/clients" element={<ManagerClients />} />
-          <Route path="/manager/quotations" element={<ManagerQuotations />} />
-          <Route path="/manager/invoices" element={<ManagerInvoices />} />
-          <Route path="/manager/receipts" element={<ManagerReceipts />} />
-          <Route path="/manager/suppliers" element={<ManagerSuppliers />} />
-          <Route path="/manager/purchase-orders" element={<ManagerPurchaseOrders />} />
-          <Route path="/manager/follow-ups" element={<ManagerFollowUps />} />
-          <Route path="/manager/sales" element={<ManagerSales />} />
-          <Route path="/manager/sales-performance" element={<ManagerSalesPerformance />} />
-          <Route path="/manager/team" element={<ManagerTeam />} />
-          <Route path="/manager/pipeline" element={<ManagerPipeline />} />
-          <Route path="/manager/performance" element={<ManagerPerformance />} />
-          <Route path="/manager/activity" element={<ManagerActivity />} />
-          <Route path="/manager/reports" element={<ManagerReports />} />
-          <Route path="/manager/people" element={<ManagerPeople />} />
-          <Route path="/manager/lead-lists" element={<ManagerLeadLists />} />
-          <Route path="/manager/projects" element={<ManagerProjects />} />
-          <Route path="/manager/projects/:id" element={<ManagerProjectDetails />} />
-          <Route path="/sales/my-leads" element={<SalesMyLeads />} />
-          <Route path="/sales/follow-ups" element={<SalesFollowUps />} />
-          <Route path="/sales/pipeline" element={<SalesPipeline />} />
-          <Route path="/sales/leaderboard" element={<SalesLeaderboard />} />
-          <Route path="/sales/stats" element={<SalesStats />} />
-          <Route path="/sales/proposals" element={<SalesProposals />} />
-          <Route path="/leads" element={<Leads />} />
-          <Route path="/teams" element={<Teams />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/regions" element={<Regions />} />
-          <Route path="/revenue" element={<RevenueReports />} />
-          <Route path="/owner-dashboard" element={<OwnerDashboard />} />
-          <Route path="/manager-dashboard" element={<ManagerDashboard />} />
-          <Route path="/salesman-dashboard" element={<SalesmanDashboard />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+          {/* All protected routes — require authentication */}
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/whoami" element={<ProtectedRoute><WhoAmI /></ProtectedRoute>} />
+
+          {/* Owner routes */}
+          <Route path="/owner" element={<ProtectedRoute><OwnerDashboard /></ProtectedRoute>} />
+          <Route path="/owner-dashboard" element={<ProtectedRoute><OwnerDashboard /></ProtectedRoute>} />
+          <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
+          <Route path="/teams" element={<ProtectedRoute><Teams /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+          <Route path="/regions" element={<ProtectedRoute><Regions /></ProtectedRoute>} />
+          <Route path="/revenue" element={<ProtectedRoute><RevenueReports /></ProtectedRoute>} />
+
+          {/* Manager routes */}
+          <Route path="/manager" element={<ProtectedRoute><ManagerDashboard /></ProtectedRoute>} />
+          <Route path="/manager-dashboard" element={<ProtectedRoute><ManagerDashboard /></ProtectedRoute>} />
+          <Route path="/manager/leads" element={<ProtectedRoute><ManagerLeads /></ProtectedRoute>} />
+          <Route path="/manager/deal-stages" element={<ProtectedRoute><ManagerDealStages /></ProtectedRoute>} />
+          <Route path="/manager/won-deals" element={<ProtectedRoute><ManagerWonDeals /></ProtectedRoute>} />
+          <Route path="/manager/lost-deals" element={<ProtectedRoute><ManagerLostDeals /></ProtectedRoute>} />
+          <Route path="/manager/clients" element={<ProtectedRoute><ManagerClients /></ProtectedRoute>} />
+          <Route path="/manager/quotations" element={<ProtectedRoute><ManagerQuotations /></ProtectedRoute>} />
+          <Route path="/manager/invoices" element={<ProtectedRoute><ManagerInvoices /></ProtectedRoute>} />
+          <Route path="/manager/receipts" element={<ProtectedRoute><ManagerReceipts /></ProtectedRoute>} />
+          <Route path="/manager/suppliers" element={<ProtectedRoute><ManagerSuppliers /></ProtectedRoute>} />
+          <Route path="/manager/purchase-orders" element={<ProtectedRoute><ManagerPurchaseOrders /></ProtectedRoute>} />
+          <Route path="/manager/follow-ups" element={<ProtectedRoute><ManagerFollowUps /></ProtectedRoute>} />
+          <Route path="/manager/sales" element={<ProtectedRoute><ManagerSales /></ProtectedRoute>} />
+          <Route path="/manager/sales-performance" element={<ProtectedRoute><ManagerSalesPerformance /></ProtectedRoute>} />
+          <Route path="/manager/team" element={<ProtectedRoute><ManagerTeam /></ProtectedRoute>} />
+          <Route path="/manager/pipeline" element={<ProtectedRoute><ManagerPipeline /></ProtectedRoute>} />
+          <Route path="/manager/performance" element={<ProtectedRoute><ManagerPerformance /></ProtectedRoute>} />
+          <Route path="/manager/activity" element={<ProtectedRoute><ManagerActivity /></ProtectedRoute>} />
+          <Route path="/manager/reports" element={<ProtectedRoute><ManagerReports /></ProtectedRoute>} />
+          <Route path="/manager/people" element={<ProtectedRoute><ManagerPeople /></ProtectedRoute>} />
+          <Route path="/manager/lead-lists" element={<ProtectedRoute><ManagerLeadLists /></ProtectedRoute>} />
+          <Route path="/manager/projects" element={<ProtectedRoute><ManagerProjects /></ProtectedRoute>} />
+          <Route path="/manager/projects/:id" element={<ProtectedRoute><ManagerProjectDetails /></ProtectedRoute>} />
+
+          {/* Salesman routes */}
+          <Route path="/salesman" element={<ProtectedRoute><SalesmanDashboard /></ProtectedRoute>} />
+          <Route path="/salesman-dashboard" element={<ProtectedRoute><SalesmanDashboard /></ProtectedRoute>} />
+          <Route path="/sales/my-leads" element={<ProtectedRoute><SalesMyLeads /></ProtectedRoute>} />
+          <Route path="/sales/follow-ups" element={<ProtectedRoute><SalesFollowUps /></ProtectedRoute>} />
+          <Route path="/sales/pipeline" element={<ProtectedRoute><SalesPipeline /></ProtectedRoute>} />
+          <Route path="/sales/leaderboard" element={<ProtectedRoute><SalesLeaderboard /></ProtectedRoute>} />
+          <Route path="/sales/stats" element={<ProtectedRoute><SalesStats /></ProtectedRoute>} />
+          <Route path="/sales/proposals" element={<ProtectedRoute><SalesProposals /></ProtectedRoute>} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
