@@ -1530,7 +1530,8 @@ const ManagerLeads = () => {
 
         {/* Filters/Search Bar with Project Selector */}
         <Card className="p-4 bg-white border-slate-200 shadow-sm mb-4">
-          <div className="flex flex-wrap items-center gap-3">
+          {/* ── Row 1: Filters ─────────────────────────────────────────── */}
+          <div className="flex flex-wrap items-center gap-3 mb-3">
             <div className="flex-none min-w-[150px] max-w-[200px]">
               <Select
                 value={selectedProject ? selectedProject.id : "all"}
@@ -1613,9 +1614,8 @@ const ManagerLeads = () => {
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Advanced Filter Dropdown */}
-              <DropdownMenu open={showAdvancedFilters} onOpenChange={setShowAdvancedFilters}>
+            {/* Advanced Filter Dropdown */}
+            <DropdownMenu open={showAdvancedFilters} onOpenChange={setShowAdvancedFilters}>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
@@ -1889,103 +1889,104 @@ const ManagerLeads = () => {
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
+          </div>
 
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                {/* Export to Excel Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportToExcel}
-                  className="gap-2 h-9 w-full sm:w-auto shrink-0"
-                  disabled={filteredLeads.length === 0}
-                >
-                  <Download className="w-4 h-4" />
-                  Export Excel
-                </Button>
+          {/* ── Row 2: Action buttons (horizontally scrollable) ─────── */}
+          <div className="overflow-x-auto -mx-4 px-4">
+            <div className="flex items-center gap-2 pb-1 min-w-max">
 
-                {/* AI Score Leads Button */}
-                <Button
-                  onClick={() => setShowScoringDialog(true)}
-                  disabled={filteredLeads.length === 0}
-                  className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
-                  title={filteredLeads.length === 0 ? "No leads to score" : "Score leads with Gemini AI"}
-                >
-                  🎯 Score Leads
-                </Button>
+              {/* ─ Add & Import ─ */}
+              <Button
+                onClick={() => setShowAddLeadModal(true)}
+                disabled={!selectedProject}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 shrink-0 whitespace-nowrap"
+                title={!selectedProject ? "Select a project to add a lead" : "Add a new lead"}
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Add Lead
+              </Button>
 
-                {/* AI Generate Leads Button */}
-                <Button
-                  onClick={() => setShowAILeadDialog(true)}
-                  disabled={!selectedProject}
-                  className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
-                  title={!selectedProject ? "Select a project first" : "Generate leads with Gemini AI"}
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  AI Generate Leads
-                </Button>
+              <Button
+                onClick={() => {
+                  setShowBulkImportModal(true);
+                  setExcelData([]);
+                  setExcelHeaders([]);
+                  setImportMessage(null);
+                  if (selectedProject) setSelectedImportProject(selectedProject.id);
+                }}
+                disabled={projects.length === 0}
+                className="bg-slate-600 hover:bg-slate-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 shrink-0 whitespace-nowrap"
+                title="Import leads from Excel"
+              >
+                <Upload className="w-4 h-4 mr-1.5" />
+                Excel Import
+              </Button>
 
-                {/* Add Lead Button */}
-                <Button
-                  onClick={() => setShowAddLeadModal(true)}
-                  disabled={!selectedProject}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
-                  title={!selectedProject ? "Select a project to add a lead. Switch to a specific project above." : "Add a new lead"}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Lead
-                </Button>
+              <Button
+                onClick={() => setShowWAGroupImport(true)}
+                disabled={projects.length === 0}
+                className="bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 shrink-0 whitespace-nowrap"
+                title="Import contacts from a WhatsApp group"
+              >
+                <MessageCircle className="w-4 h-4 mr-1.5" />
+                WA Group Import
+              </Button>
 
-                {/* Bulk Import Button */}
-                <Button 
-                  onClick={() => {
-                    setShowBulkImportModal(true);
-                    setExcelData([]);
-                    setExcelHeaders([]);
-                    setImportMessage(null);
-                    if (selectedProject) {
-                      setSelectedImportProject(selectedProject.id);
-                    }
-                  }}
-                  disabled={projects.length === 0}
-                  className="bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
-                  title={projects.length === 0 ? "Create a project first to import leads" : "Import leads from Excel file"}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Bulk Import
-                </Button>
+              <div className="w-px h-6 bg-slate-200 shrink-0" />
 
-                {/* WhatsApp Bulk Sender Button */}
-                <Button
-                  onClick={() => setShowWhatsApp(true)}
-                  disabled={selectedLeadIds.size === 0}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
-                  title={selectedLeadIds.size === 0 ? "Select leads first" : `Send WhatsApp to ${selectedLeadIds.size} lead${selectedLeadIds.size !== 1 ? "s" : ""}`}
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  WhatsApp
-                </Button>
+              {/* ─ AI Tools ─ */}
+              <Button
+                onClick={() => setShowAILeadDialog(true)}
+                disabled={!selectedProject}
+                className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 shrink-0 whitespace-nowrap"
+                title={!selectedProject ? "Select a project first" : "Generate leads with Gemini AI"}
+              >
+                <Sparkles className="w-4 h-4 mr-1.5" />
+                AI Generate
+              </Button>
 
-                {/* WhatsApp Group Import Button */}
-                <Button
-                  onClick={() => setShowWAGroupImport(true)}
-                  disabled={projects.length === 0}
-                  className="bg-green-700 hover:bg-green-800 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
-                  title={projects.length === 0 ? "Create a project first" : "Import contacts from a WhatsApp group"}
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  WA Group Import
-                </Button>
+              <Button
+                onClick={() => setShowScoringDialog(true)}
+                disabled={filteredLeads.length === 0}
+                className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 shrink-0 whitespace-nowrap"
+                title={filteredLeads.length === 0 ? "No leads to score" : "Score leads with Gemini AI"}
+              >
+                🎯 AI Score
+              </Button>
 
-                {/* Follow-ups Button */}
-                <Button
-                  onClick={() => navigate('/manager/follow-ups')}
-                  className="bg-orange-600 hover:bg-orange-700 text-white font-medium h-9 w-full sm:w-auto shrink-0"
-                  title="View all follow-ups"
-                >
-                  <CalendarCheck className="w-4 h-4 mr-2" />
-                  Follow-ups
-                </Button>
-              </div>
+              <div className="w-px h-6 bg-slate-200 shrink-0" />
+
+              {/* ─ Messaging ─ */}
+              <Button
+                onClick={() => setShowWhatsApp(true)}
+                disabled={selectedLeadIds.size === 0}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 shrink-0 whitespace-nowrap"
+                title={selectedLeadIds.size === 0 ? "Select leads first" : `Send WhatsApp to ${selectedLeadIds.size} selected`}
+              >
+                <MessageCircle className="w-4 h-4 mr-1.5" />
+                WhatsApp{selectedLeadIds.size > 0 ? ` (${selectedLeadIds.size})` : ""}
+              </Button>
+
+              <div className="w-px h-6 bg-slate-200 shrink-0" />
+
+              {/* ─ Export & Follow-ups ─ */}
+              <Button
+                variant="outline"
+                onClick={handleExportToExcel}
+                className="h-9 shrink-0 whitespace-nowrap border-slate-300"
+                disabled={filteredLeads.length === 0}
+              >
+                <Download className="w-4 h-4 mr-1.5" />
+                Export Excel
+              </Button>
+
+              <Button
+                onClick={() => navigate('/manager/follow-ups')}
+                className="bg-orange-600 hover:bg-orange-700 text-white font-medium h-9 shrink-0 whitespace-nowrap"
+              >
+                <CalendarCheck className="w-4 h-4 mr-1.5" />
+                Follow-ups
+              </Button>
             </div>
           </div>
         </Card>
