@@ -1730,6 +1730,7 @@ const ManagerLeads = () => {
                         <SelectContent>
                           <SelectItem value="all">All Categories</SelectItem>
                           <SelectItem value="erp">ERP</SelectItem>
+                          <SelectItem value="blockchain_erp">Blockchain ERP</SelectItem>
                           <SelectItem value="crm">CRM</SelectItem>
                           <SelectItem value="hrms">HRMS</SelectItem>
                           <SelectItem value="accounting">Accounting</SelectItem>
@@ -3094,6 +3095,7 @@ const ManagerLeads = () => {
                         <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="erp">ERP</SelectItem>
+                          <SelectItem value="blockchain_erp">Blockchain ERP</SelectItem>
                           <SelectItem value="crm">CRM</SelectItem>
                           <SelectItem value="hrms">HRMS</SelectItem>
                           <SelectItem value="accounting">Accounting</SelectItem>
