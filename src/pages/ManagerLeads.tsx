@@ -4,6 +4,7 @@ import { Plus, Loader, CheckCircle, Clock, XCircle, AlertCircle, Filter, Search,
 import AILeadGenerationDialog from "@/components/AILeadGenerationDialog";
 import AILeadScoringDialog from "@/components/AILeadScoringDialog";
 import WhatsAppSender from "@/components/WhatsAppSender";
+import WhatsAppGroupImport from "@/components/WhatsAppGroupImport";
 import { exportLeadsToExcel } from "@/lib/exportExcel";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Card } from "@/components/ui/card";
@@ -253,6 +254,7 @@ const ManagerLeads = () => {
   const [showAILeadDialog, setShowAILeadDialog] = useState(false);
   const [showScoringDialog, setShowScoringDialog] = useState(false);
   const [aiScores, setAiScores] = useState<Record<string, number>>({});
+  const [showWAGroupImport, setShowWAGroupImport] = useState(false);
   
   // Bulk import states
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
@@ -1961,6 +1963,17 @@ const ManagerLeads = () => {
                 >
                   <MessageCircle className="w-4 h-4 mr-2" />
                   WhatsApp
+                </Button>
+
+                {/* WhatsApp Group Import Button */}
+                <Button
+                  onClick={() => setShowWAGroupImport(true)}
+                  disabled={projects.length === 0}
+                  className="bg-green-700 hover:bg-green-800 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
+                  title={projects.length === 0 ? "Create a project first" : "Import contacts from a WhatsApp group"}
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  WA Group Import
                 </Button>
 
                 {/* Follow-ups Button */}
@@ -4827,6 +4840,20 @@ const ManagerLeads = () => {
         onClose={() => setShowWhatsApp(false)}
         leads={leads.filter(l => selectedLeadIds.has(l.id))}
         mode={selectedLeadIds.size === 1 ? "single" : "bulk"}
+      />
+
+      {/* WhatsApp Group Import */}
+      <WhatsAppGroupImport
+        open={showWAGroupImport}
+        onClose={() => setShowWAGroupImport(false)}
+        projects={projects}
+        salesUsers={salesUsers}
+        defaultProjectId={selectedProject?.id}
+        onImported={async (count) => {
+          // Reload leads after import
+          const leadsRes = await import("@/lib/supabase").then(m => m.getLeads());
+          if (leadsRes?.data) setLeads(leadsRes.data as any[]);
+        }}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, DragEvent } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import { Search, Loader2, LayoutKanban, Building2, User, DollarSign, AlertCircle } from "lucide-react";
+import { Search, Loader2, Kanban, Building2, User, DollarSign, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -497,7 +497,7 @@ const ManagerPipeline = () => {
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <LayoutKanban className="w-6 h-6 text-slate-700" />
+                <Kanban className="w-6 h-6 text-slate-700" />
                 <h1 className="text-2xl font-bold text-slate-900">Pipeline Board</h1>
               </div>
               <p className="text-sm text-slate-500">
