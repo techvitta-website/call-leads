@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Loader, CheckCircle, Clock, XCircle, AlertCircle, Filter, Search, Mail, Phone as PhoneIcon, Briefcase, Upload, FileSpreadsheet, UserPlus, MoreHorizontal, Edit, Trash2, ChevronDown, Download, X, StickyNote, Calendar, MessageCircle, CalendarCheck, Sparkles } from "lucide-react";
 import AILeadGenerationDialog from "@/components/AILeadGenerationDialog";
+import AILeadScoringDialog from "@/components/AILeadScoringDialog";
+import WhatsAppSender from "@/components/WhatsAppSender";
+import { exportLeadsToExcel } from "@/lib/exportExcel";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +79,7 @@ const ManagerLeads = () => {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showCallbackModal, setShowCallbackModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedLeadForActivity, setSelectedLeadForActivity] = useState<any | null>(null);
   const [selectedLeadForWhatsApp, setSelectedLeadForWhatsApp] = useState<any | null>(null);
@@ -247,6 +251,8 @@ const ManagerLeads = () => {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showAILeadDialog, setShowAILeadDialog] = useState(false);
+  const [showScoringDialog, setShowScoringDialog] = useState(false);
+  const [aiScores, setAiScores] = useState<Record<string, number>>({});
   
   // Bulk import states
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
@@ -1422,69 +1428,7 @@ const ManagerLeads = () => {
       alert("No leads to export.");
       return;
     }
-
-    // Prepare data for export
-    const exportData = filteredLeads.map((lead) => {
-      const phoneNumbers = (() => {
-        const phone = lead.phone || "";
-        if (!phone) return "";
-        return String(phone).split(/[,;|\n\r]+/).map(p => p.trim()).filter(p => p).join(", ");
-      })();
-
-      const assignedUser = salesUsers.find(u => u.id === lead.assigned_to);
-
-      return {
-        "Company Name": lead.company_name || "",
-        "Contact Name": lead.contact_name || "",
-        "Designation": (lead as any).designation || "",
-        "Email": lead.email || "",
-        "Phone": phoneNumbers || "",
-        "Mobile Phone": (lead as any).mobile_phone || "",
-        "Direct Phone": (lead as any).direct_phone || "",
-        "Office Phone": (lead as any).office_phone || "",
-        "LinkedIn": (lead as any).linkedin || "",
-        "Address Line 1": (lead as any).address_line1 || "",
-        "Address Line 2": (lead as any).address_line2 || "",
-        "City": (lead as any).city || "",
-        "State": (lead as any).state || "",
-        "Country": (lead as any).country || "",
-        "Zip": (lead as any).zip || "",
-        "Status": statusLabel[lead.status] || lead.status || "",
-        "Value": lead.value || 0,
-        "Project": lead.projects?.name || "Unassigned",
-        "Assigned To": assignedUser ? (assignedUser.full_name || assignedUser.email?.split("@")[0] || "Unknown") : "Unassigned",
-        "Customer Group": (lead as any).customer_group || "",
-        "Product Group": (lead as any).product_group || "",
-        "Lead Source": (lead as any).lead_source || "",
-        "Data Source": (lead as any).data_source || "",
-        "Lead Score": (lead as any).lead_score || "",
-        "Next Follow-up Date": (lead as any).next_followup_date ? new Date((lead as any).next_followup_date).toLocaleDateString() : "",
-        "Follow-up Notes": (lead as any).followup_notes || "",
-        "Lead Notes": (lead as any).lead_notes || "",
-        "Organization Notes": (lead as any).organization_notes || "",
-        "Date of Birth": (lead as any).date_of_birth || "",
-        "Special Event Date": (lead as any).special_event_date || "",
-        "Reference URL 1": (lead as any).reference_url1 || "",
-        "Reference URL 2": (lead as any).reference_url2 || "",
-        "Reference URL 3": (lead as any).reference_url3 || "",
-        "List Name": (lead as any).list_name || "",
-        "Description": lead.description || "",
-        "Website": lead.link || "",
-        "Created At": lead.created_at ? new Date(lead.created_at).toLocaleDateString() : "",
-        "Last Contacted": lead.last_contacted_at ? new Date(lead.last_contacted_at).toLocaleDateString() : "",
-      };
-  });
-
-    // Create workbook and worksheet
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Leads");
-
-    // Generate filename with current date
-    const filename = `leads_export_${new Date().toISOString().split('T')[0]}.xlsx`;
-
-    // Download file
-    XLSX.writeFile(wb, filename);
+    exportLeadsToExcel(filteredLeads, `leads_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   // Check if all filtered leads are selected
@@ -1957,6 +1901,16 @@ const ManagerLeads = () => {
                   Export Excel
                 </Button>
 
+                {/* AI Score Leads Button */}
+                <Button
+                  onClick={() => setShowScoringDialog(true)}
+                  disabled={filteredLeads.length === 0}
+                  className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
+                  title={filteredLeads.length === 0 ? "No leads to score" : "Score leads with Gemini AI"}
+                >
+                  🎯 Score Leads
+                </Button>
+
                 {/* AI Generate Leads Button */}
                 <Button
                   onClick={() => setShowAILeadDialog(true)}
@@ -1998,8 +1952,19 @@ const ManagerLeads = () => {
                   Bulk Import
                 </Button>
 
+                {/* WhatsApp Bulk Sender Button */}
+                <Button
+                  onClick={() => setShowWhatsApp(true)}
+                  disabled={selectedLeadIds.size === 0}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
+                  title={selectedLeadIds.size === 0 ? "Select leads first" : `Send WhatsApp to ${selectedLeadIds.size} lead${selectedLeadIds.size !== 1 ? "s" : ""}`}
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  WhatsApp
+                </Button>
+
                 {/* Follow-ups Button */}
-                <Button 
+                <Button
                   onClick={() => navigate('/manager/follow-ups')}
                   className="bg-orange-600 hover:bg-orange-700 text-white font-medium h-9 w-full sm:w-auto shrink-0"
                   title="View all follow-ups"
@@ -2143,6 +2108,19 @@ const ManagerLeads = () => {
                                     <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs px-1.5 py-0.5 mt-0.5">
                                       Stale ({daysStale}d)
                                     </Badge>
+                            )}
+                            {aiScores[lead.id] !== undefined && (
+                              <Badge
+                                className={`text-[10px] px-1.5 py-0.5 mt-0.5 border font-semibold ${
+                                  aiScores[lead.id] >= 80
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : aiScores[lead.id] >= 50
+                                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                                    : "bg-rose-50 text-rose-700 border-rose-200"
+                                }`}
+                              >
+                                🎯 {aiScores[lead.id]}
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -4831,6 +4809,25 @@ const ManagerLeads = () => {
           }}
         />
       )}
+
+      {/* AI Lead Scoring Dialog */}
+      <AILeadScoringDialog
+        open={showScoringDialog}
+        onClose={() => setShowScoringDialog(false)}
+        leads={filteredLeads}
+        onScoresApplied={(scores) => {
+          setAiScores((prev) => ({ ...prev, ...scores }));
+          setShowScoringDialog(false);
+        }}
+      />
+
+      {/* WhatsApp Bulk Sender */}
+      <WhatsAppSender
+        open={showWhatsApp}
+        onClose={() => setShowWhatsApp(false)}
+        leads={leads.filter(l => selectedLeadIds.has(l.id))}
+        mode={selectedLeadIds.size === 1 ? "single" : "bulk"}
+      />
     </div>
   );
 };

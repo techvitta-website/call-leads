@@ -1,243 +1,425 @@
+import { useState, useEffect, useMemo } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Users, Target, Activity } from "lucide-react";
-import { useState, useEffect } from "react";
-import { getLeads } from "@/lib/supabase";
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
+import {
+  Users, Target, DollarSign, TrendingUp, Loader2,
+} from "lucide-react";
+import { getLeads, getUsers } from "@/lib/supabase";
+import { formatCurrency, formatCurrencyCompact } from "@/utils/currency";
+
+const CHART_TOOLTIP_STYLE = {
+  backgroundColor: "rgba(15, 23, 42, 0.95)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: "8px",
+  color: "#fff",
+};
+
+const FUNNEL_COLORS: Record<string, string> = {
+  New: "#3b82f6",
+  Qualified: "#8b5cf6",
+  Proposal: "#f59e0b",
+  "Closed Won": "#10b981",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  new: "#3b82f6",
+  qualified: "#8b5cf6",
+  proposal: "#f59e0b",
+  closed_won: "#10b981",
+  not_interested: "#ef4444",
+};
+
+const SOURCE_PALETTE = [
+  "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#06b6d4", "#94a3b8",
+];
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function getLastSixMonths(): { label: string; year: number; month: number }[] {
+  const now = new Date();
+  const result = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    result.push({ label: MONTH_LABELS[d.getMonth()], year: d.getFullYear(), month: d.getMonth() });
+  }
+  return result;
+}
 
 const Analytics = () => {
-  const [monthlyRevenue, setMonthlyRevenue] = useState<any[]>([]);
-  const [leadSourceData, setLeadSourceData] = useState<any[]>([]);
-  const [conversionFunnel, setConversionFunnel] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
+    const fetchData = async () => {
       setLoading(true);
-      const { data: leads } = await getLeads();
-      
-      if (leads && leads.length > 0) {
-        // Calculate lead sources from actual data
-        const sourceMap = new Map();
-        leads.forEach((l: any) => {
-          const source = l.source || 'Direct';
-          sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
-        });
-        const total = leads.length;
-        const sources = Array.from(sourceMap.entries()).map(([name, count], idx) => ({
-          name,
-          value: Math.round(((count as number) / total) * 100),
-          color: ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'][idx % 5]
-        }));
-        
-        // Calculate conversion funnel from actual data
-        const statusCounts = {
-          total: leads.length,
-          new: leads.filter((l: any) => l.status === 'new').length,
-          qualified: leads.filter((l: any) => l.status === 'qualified').length,
-          proposal: leads.filter((l: any) => l.status === 'proposal').length,
-          closedWon: leads.filter((l: any) => l.status === 'closed_won').length,
-        };
-        
-        setLeadSourceData(sources.length > 0 ? sources : fallbackLeadSources);
-        setConversionFunnel([
-          { stage: 'Leads', count: statusCounts.total },
-          { stage: 'Qualified', count: statusCounts.qualified },
-          { stage: 'In Proposal', count: statusCounts.proposal },
-          { stage: 'Closed Won', count: statusCounts.closedWon },
-        ]);
-        setMonthlyRevenue(fallbackMonthlyRevenue); // Keep fallback for monthly
-      } else {
-        setMonthlyRevenue(fallbackMonthlyRevenue);
-        setLeadSourceData(fallbackLeadSources);
-        setConversionFunnel(fallbackConversionFunnel);
-      }
-      
+      const [leadsResult, usersResult] = await Promise.all([getLeads(), getUsers()]);
+      setLeads(leadsResult.data || []);
+      setUsers(usersResult.data || []);
       setLoading(false);
     };
-    fetchAnalytics();
+    fetchData();
   }, []);
 
-  const fallbackMonthlyRevenue = [
-    { month: 'Jan', revenue: 420, target: 380, deals: 12 },
-    { month: 'Feb', revenue: 485, target: 420, deals: 15 },
-    { month: 'Mar', revenue: 550, target: 450, deals: 18 },
-    { month: 'Apr', revenue: 615, target: 500, deals: 21 },
-    { month: 'May', revenue: 680, target: 550, deals: 24 },
-    { month: 'Jun', revenue: 745, target: 600, deals: 26 },
-  ];
+  // ── KPI computations ──────────────────────────────────────────────────────
+  const kpis = useMemo(() => {
+    const total = leads.length;
+    const closedWon = leads.filter((l) => l.status === "closed_won");
+    const winRate = total > 0 ? ((closedWon.length / total) * 100).toFixed(1) : "0.0";
+    const wonValue = closedWon.reduce((s, l) => s + (l.value || 0), 0);
+    const avgDeal = closedWon.length > 0 ? wonValue / closedWon.length : 0;
+    const activeStatuses = ["new", "qualified", "proposal"];
+    const pipelineValue = leads
+      .filter((l) => activeStatuses.includes(l.status))
+      .reduce((s, l) => s + (l.value || 0), 0);
+    return { total, winRate, avgDeal, pipelineValue };
+  }, [leads]);
 
-  const fallbackLeadSources = [
-    { name: 'Website', value: 35, color: '#3b82f6' },
-    { name: 'Referral', value: 25, color: '#8b5cf6' },
-    { name: 'Cold Call', value: 20, color: '#ec4899' },
-    { name: 'LinkedIn', value: 15, color: '#f59e0b' },
-    { name: 'Email', value: 5, color: '#10b981' },
-  ];
+  // ── Funnel ────────────────────────────────────────────────────────────────
+  const funnelData = useMemo(() => [
+    { stage: "New", count: leads.filter((l) => l.status === "new").length },
+    { stage: "Qualified", count: leads.filter((l) => l.status === "qualified").length },
+    { stage: "Proposal", count: leads.filter((l) => l.status === "proposal").length },
+    { stage: "Closed Won", count: leads.filter((l) => l.status === "closed_won").length },
+  ], [leads]);
 
-  const fallbackConversionFunnel = [
-    { stage: 'Leads', count: 450 },
-    { stage: 'Qualified', count: 320 },
-    { stage: 'In Proposal', count: 180 },
-    { stage: 'Closed Won', count: 68 },
-  ];
+  // ── Lead Source Breakdown ─────────────────────────────────────────────────
+  const sourceData = useMemo(() => {
+    const map = new Map<string, number>();
+    leads.forEach((l) => {
+      const src = l.lead_source?.trim() || "Unknown";
+      map.set(src, (map.get(src) || 0) + 1);
+    });
+    const sorted = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    const top6 = sorted.slice(0, 6);
+    const otherCount = sorted.slice(6).reduce((s, [, c]) => s + c, 0);
+    const result = top6.map(([name, value], i) => ({ name, value, color: SOURCE_PALETTE[i] }));
+    if (otherCount > 0) result.push({ name: "Other", value: otherCount, color: SOURCE_PALETTE[6] });
+    return result;
+  }, [leads]);
+
+  // ── Status Distribution ───────────────────────────────────────────────────
+  const statusDistData = useMemo(() => {
+    const statusLabels: Record<string, string> = {
+      new: "New",
+      qualified: "Qualified",
+      proposal: "Proposal",
+      closed_won: "Closed Won",
+      not_interested: "Not Interested",
+    };
+    return Object.entries(statusLabels).map(([key, label]) => ({
+      status: label,
+      count: leads.filter((l) => l.status === key).length,
+      fill: STATUS_COLORS[key],
+    }));
+  }, [leads]);
+
+  // ── Monthly Trend ─────────────────────────────────────────────────────────
+  const monthlyTrend = useMemo(() => {
+    const months = getLastSixMonths();
+    return months.map(({ label, year, month }) => ({
+      month: label,
+      count: leads.filter((l) => {
+        if (!l.created_at) return false;
+        const d = new Date(l.created_at);
+        return d.getFullYear() === year && d.getMonth() === month;
+      }).length,
+    }));
+  }, [leads]);
+
+  // ── Salesperson Leaderboard ───────────────────────────────────────────────
+  const leaderboard = useMemo(() => {
+    const salesmen = users.filter((u) => u.role === "salesman");
+    return salesmen
+      .map((user) => {
+        const myLeads = leads.filter((l) => l.assigned_to === user.id);
+        const won = myLeads.filter((l) => l.status === "closed_won").length;
+        const rate = myLeads.length > 0 ? ((won / myLeads.length) * 100).toFixed(0) : "0";
+        return { name: user.full_name || user.email || "Unknown", assigned: myLeads.length, won, rate };
+      })
+      .filter((s) => s.assigned > 0)
+      .sort((a, b) => b.won - a.won)
+      .slice(0, 10);
+  }, [leads, users]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <DashboardSidebar role="owner" />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 text-slate-400">
+            <Loader2 className="w-10 h-10 animate-spin text-blue-400" />
+            <span className="text-sm">Loading analytics…</span>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const isEmpty = leads.length === 0;
+
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <DashboardSidebar role="owner" />
       <main className="flex-1 p-4 lg:p-8 pt-20 sm:pt-16 lg:pt-8 overflow-auto">
+
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Analytics</h1>
-          <p className="text-slate-400">Deep insights into your sales performance</p>
+          <h1 className="text-3xl font-bold text-white mb-1">Analytics</h1>
+          <p className="text-slate-400">Owner dashboard — real-time insights from all leads</p>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 backdrop-blur-sm border border-blue-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex items-center gap-1 text-green-400 text-sm">
-                <TrendingUp className="w-4 h-4" />
-                +24%
-              </div>
-            </div>
-            <div className="text-sm text-slate-400 mb-1">Total Revenue</div>
-            <div className="text-2xl font-bold text-white">$745K</div>
+        {isEmpty && (
+          <div className="bg-white/5 border border-white/10 rounded-xl p-10 text-center text-slate-400 mb-8">
+            No lead data found. Add leads to see analytics.
           </div>
+        )}
 
-          <div className="bg-gradient-to-br from-purple-600/20 to-purple-800/20 backdrop-blur-sm border border-purple-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-lg bg-purple-600 flex items-center justify-center">
-                <Target className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex items-center gap-1 text-green-400 text-sm">
-                <TrendingUp className="w-4 h-4" />
-                +15%
-              </div>
-            </div>
-            <div className="text-sm text-slate-400 mb-1">Conversion Rate</div>
-            <div className="text-2xl font-bold text-white">15.1%</div>
-          </div>
-
-          <div className="bg-gradient-to-br from-amber-600/20 to-amber-800/20 backdrop-blur-sm border border-amber-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-lg bg-amber-600 flex items-center justify-center">
-                <Activity className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex items-center gap-1 text-green-400 text-sm">
-                <TrendingUp className="w-4 h-4" />
-                +8%
-              </div>
-            </div>
-            <div className="text-sm text-slate-400 mb-1">Active Deals</div>
-            <div className="text-2xl font-bold text-white">274</div>
-          </div>
-
-          <div className="bg-gradient-to-br from-green-600/20 to-green-800/20 backdrop-blur-sm border border-green-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-lg bg-green-600 flex items-center justify-center">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex items-center gap-1 text-red-400 text-sm">
-                <TrendingDown className="w-4 h-4" />
-                -3%
-              </div>
-            </div>
-            <div className="text-sm text-slate-400 mb-1">Avg Deal Size</div>
-            <div className="text-2xl font-bold text-white">$28.6K</div>
-          </div>
+        {/* ── KPI Cards ───────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <KpiCard
+            icon={<Users className="w-6 h-6 text-white" />}
+            iconBg="bg-blue-600"
+            cardGradient="from-blue-600/20 to-blue-800/20"
+            borderColor="border-blue-500/20"
+            label="Total Leads"
+            value={kpis.total.toLocaleString("en-IN")}
+          />
+          <KpiCard
+            icon={<Target className="w-6 h-6 text-white" />}
+            iconBg="bg-emerald-600"
+            cardGradient="from-emerald-600/20 to-emerald-800/20"
+            borderColor="border-emerald-500/20"
+            label="Win Rate"
+            value={`${kpis.winRate}%`}
+          />
+          <KpiCard
+            icon={<DollarSign className="w-6 h-6 text-white" />}
+            iconBg="bg-amber-600"
+            cardGradient="from-amber-600/20 to-amber-800/20"
+            borderColor="border-amber-500/20"
+            label="Avg Deal Value"
+            value={formatCurrencyCompact(kpis.avgDeal)}
+          />
+          <KpiCard
+            icon={<TrendingUp className="w-6 h-6 text-white" />}
+            iconBg="bg-purple-600"
+            cardGradient="from-purple-600/20 to-purple-800/20"
+            borderColor="border-purple-500/20"
+            label="Pipeline Value"
+            value={formatCurrencyCompact(kpis.pipelineValue)}
+          />
         </div>
 
-        {/* Charts Grid */}
+        {/* ── Row 1: Funnel + Source ───────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Revenue Trend */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Revenue vs Target</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyRevenue}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis dataKey="month" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} name="Revenue ($K)" />
-                <Line type="monotone" dataKey="target" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" name="Target ($K)" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
 
-          {/* Lead Sources */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Lead Sources</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={leadSourceData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {leadSourceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+          {/* Lead Funnel */}
+          <ChartCard title="Lead Funnel" subtitle="New → Qualified → Proposal → Closed Won">
+            {isEmpty ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={funnelData} layout="vertical" margin={{ left: 16, right: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                  <XAxis type="number" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 12 }} />
+                  <YAxis dataKey="stage" type="category" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 12 }} width={80} />
+                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+                  <Bar dataKey="count" name="Leads" radius={[0, 6, 6, 0]}>
+                    {funnelData.map((entry) => (
+                      <Cell key={entry.stage} fill={FUNNEL_COLORS[entry.stage] || "#3b82f6"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          {/* Lead Source Breakdown */}
+          <ChartCard title="Lead Source Breakdown" subtitle="Top sources by volume">
+            {isEmpty || sourceData.length === 0 ? <EmptyChart /> : (
+              <>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={sourceData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={90}
+                      innerRadius={40}
+                      dataKey="value"
+                      labelLine={false}
+                      label={({ name, percent }) =>
+                        percent > 0.06 ? `${(percent * 100).toFixed(0)}%` : ""
+                      }
+                    >
+                      {sourceData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(v: any) => [v, "Leads"]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                  {sourceData.map((s) => (
+                    <div key={s.name} className="flex items-center gap-1.5 text-xs text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                      {s.name} <span className="text-slate-500">({s.value})</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {leadSourceData.map((source) => (
-                <div key={source.name} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: source.color }}></div>
-                  <span className="text-sm text-slate-300">{source.name}</span>
                 </div>
-              ))}
-            </div>
-          </div>
+              </>
+            )}
+          </ChartCard>
         </div>
 
-        {/* Conversion Funnel */}
+        {/* ── Row 2: Status Distribution + Monthly Trend ───────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+          {/* Status Distribution */}
+          <ChartCard title="Status Distribution" subtitle="Count per lead status">
+            {isEmpty ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={statusDistData} layout="vertical" margin={{ left: 8, right: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                  <XAxis type="number" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 12 }} />
+                  <YAxis dataKey="status" type="category" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 12 }} width={100} />
+                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+                  <Bar dataKey="count" name="Leads" radius={[0, 6, 6, 0]}>
+                    {statusDistData.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          {/* Monthly Trend */}
+          <ChartCard title="Monthly Lead Trend" subtitle="Leads created — last 6 months">
+            {isEmpty ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={monthlyTrend} margin={{ left: 0, right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                  <XAxis dataKey="month" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 12 }} />
+                  <YAxis stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 12 }} allowDecimals={false} />
+                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(v: any) => [v, "Leads"]} />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#3b82f6"
+                    strokeWidth={2.5}
+                    dot={{ fill: "#3b82f6", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Leads Created"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+        </div>
+
+        {/* ── Leaderboard ──────────────────────────────────────────────── */}
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Sales Funnel</h2>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={conversionFunnel} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-              <XAxis type="number" stroke="#94a3b8" />
-              <YAxis dataKey="stage" type="category" stroke="#94a3b8" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                  color: '#fff'
-                }}
-              />
-              <Bar dataKey="count" fill="#3b82f6" radius={[0, 8, 8, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <h2 className="text-lg font-semibold text-white mb-1">Top Performing Salespeople</h2>
+          <p className="text-xs text-slate-400 mb-4">Ranked by closed won deals</p>
+
+          {leaderboard.length === 0 ? (
+            <p className="text-slate-500 text-sm py-6 text-center">
+              No salesperson data available yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-400 border-b border-white/10">
+                    <th className="pb-2 pr-4 font-medium">#</th>
+                    <th className="pb-2 pr-4 font-medium">Name</th>
+                    <th className="pb-2 pr-4 font-medium text-right">Leads Assigned</th>
+                    <th className="pb-2 pr-4 font-medium text-right">Closed Won</th>
+                    <th className="pb-2 font-medium text-right">Win Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboard.map((row, idx) => (
+                    <tr key={row.name} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-3 pr-4 text-slate-500">{idx + 1}</td>
+                      <td className="py-3 pr-4 text-white font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-500/30 flex items-center justify-center text-blue-300 text-xs font-bold">
+                            {row.name[0]?.toUpperCase()}
+                          </div>
+                          {row.name}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 text-slate-300 text-right">{row.assigned}</td>
+                      <td className="py-3 pr-4 text-right">
+                        <span className="text-emerald-400 font-semibold">{row.won}</span>
+                      </td>
+                      <td className="py-3 text-right">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+                          Number(row.rate) >= 50
+                            ? "bg-emerald-500/20 text-emerald-300"
+                            : Number(row.rate) >= 25
+                            ? "bg-amber-500/20 text-amber-300"
+                            : "bg-red-500/20 text-red-300"
+                        }`}>
+                          {row.rate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </main>
     </div>
   );
 };
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+interface KpiCardProps {
+  icon: React.ReactNode;
+  iconBg: string;
+  cardGradient: string;
+  borderColor: string;
+  label: string;
+  value: string;
+}
+
+const KpiCard = ({ icon, iconBg, cardGradient, borderColor, label, value }: KpiCardProps) => (
+  <div className={`bg-gradient-to-br ${cardGradient} backdrop-blur-sm border ${borderColor} rounded-xl p-5`}>
+    <div className={`w-11 h-11 rounded-lg ${iconBg} flex items-center justify-center mb-3`}>
+      {icon}
+    </div>
+    <div className="text-xs text-slate-400 mb-1 uppercase tracking-wide">{label}</div>
+    <div className="text-2xl font-bold text-white">{value}</div>
+  </div>
+);
+
+interface ChartCardProps {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}
+
+const ChartCard = ({ title, subtitle, children }: ChartCardProps) => (
+  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
+    <h2 className="text-base font-semibold text-white mb-0.5">{title}</h2>
+    {subtitle && <p className="text-xs text-slate-400 mb-4">{subtitle}</p>}
+    {children}
+  </div>
+);
+
+const EmptyChart = () => (
+  <div className="h-48 flex items-center justify-center text-slate-500 text-sm">
+    No data to display
+  </div>
+);
+
 export default Analytics;
-
-
