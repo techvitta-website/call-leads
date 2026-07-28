@@ -1,0 +1,177 @@
+{
+  "name": "Hosted Lead Form → Call-Leads CRM (no platform approval needed)",
+  "nodes": [
+    {
+      "id": "b41d0aa9-7e63-4c25-9a80-1f3d5c7e8b02",
+      "name": "Lead Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [-260, 0],
+      "webhookId": "c2f8e1a4-6b90-4d37-8e52-9a0b1c3d5e7f",
+      "parameters": {
+        "path": "enquiry",
+        "formTitle": "Request a demo",
+        "formDescription": "Tell us a little about your company and we'll get back to you within one business day.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Your name",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Work email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Mobile",
+              "fieldType": "text",
+              "placeholder": "98480 12345",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Your role",
+              "fieldType": "text",
+              "placeholder": "e.g. HR Head, Operations Manager",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "City",
+              "fieldType": "text",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "What are you looking for?",
+              "fieldType": "textarea",
+              "requiredField": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "n8n hosts this form for you. Point your Instagram and LinkedIn ads at the form URL shown once the workflow is active. No Meta or LinkedIn review required."
+    },
+    {
+      "id": "1d6f8b02-4c39-4a75-8e21-3b9d0c5f7a48",
+      "name": "Map to CRM Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [-20, 0],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1b2c3d4-0000-4000-8000-000000000001",
+              "name": "contact_name",
+              "value": "={{ $json['Your name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-0000-4000-8000-000000000002",
+              "name": "company_name",
+              "value": "={{ $json['Company'] }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-0000-4000-8000-000000000003",
+              "name": "email",
+              "value": "={{ $json['Work email'] }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-0000-4000-8000-000000000004",
+              "name": "phone",
+              "value": "={{ $json['Mobile'] }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-0000-4000-8000-000000000005",
+              "name": "designation",
+              "value": "={{ $json['Your role'] }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-0000-4000-8000-000000000006",
+              "name": "city",
+              "value": "={{ $json['City'] }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-0000-4000-8000-000000000007",
+              "name": "message",
+              "value": "={{ $json['What are you looking for?'] }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-0000-4000-8000-000000000008",
+              "name": "lead_source",
+              "value": "Website Form",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "If you rename a form field above, update the matching expression here — the keys are the field labels exactly as typed."
+    },
+    {
+      "id": "3c9e1b77-52aa-4d0e-8f43-6b1c9e2a4d81",
+      "name": "Send to CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [220, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "PASTE_YOUR_WEBSITE_FORM_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Lead Form": {
+      "main": [
+        [
+          {
+            "node": "Map to CRM Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map to CRM Fields": {
+      "main": [
+        [
+          {
+            "node": "Send to CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "pinData": {}
+}

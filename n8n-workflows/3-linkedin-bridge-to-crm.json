@@ -1,0 +1,128 @@
+{
+  "name": "LinkedIn / Zapier bridge → Call-Leads CRM",
+  "nodes": [
+    {
+      "id": "5a7c2e91-3f48-4b60-9d12-7e8a0b4c6d93",
+      "name": "Receive Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-260, 0],
+      "webhookId": "d3a9f2b5-8c17-4e60-9b43-2f5a7c9e1d04",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "linkedin-lead",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Point Zapier's LinkedIn Lead Gen Forms trigger at this URL via a Webhooks by Zapier action. Zapier already holds LinkedIn's API approval, so you don't need your own. This same node also works for LinkedIn Lead Sync directly if you ever get approved — it responds immediately, which satisfies LinkedIn's 3-second requirement."
+    },
+    {
+      "id": "9e0b3d41-6a82-4f57-8c93-1b5d7e2a4c60",
+      "name": "Normalise Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-20, 0],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// Flatten whatever shape arrives into keys the CRM understands.\n// Handles Zapier's flat output, LinkedIn's formResponse.answers array,\n// and plain JSON. The CRM is forgiving about field names, so this is\n// mostly about pulling nested answers up to the top level.\n\nconst body = $json.body ?? $json;\nconst out = { ...body };\n\n// LinkedIn Lead Sync shape: formResponse.answers[{questionText, answer}]\nconst answers = body?.formResponse?.answers ?? body?.answers;\nif (Array.isArray(answers)) {\n  for (const a of answers) {\n    const key = a?.questionText ?? a?.name ?? a?.key;\n    const val = a?.answer ?? a?.value ?? (Array.isArray(a?.values) ? a.values[0] : undefined);\n    if (key && val !== undefined && val !== null) out[String(key)] = val;\n  }\n}\n\n// Build a full name if only first/last arrived.\nif (!out.contact_name && !out.full_name) {\n  const first = out.firstName ?? out.first_name ?? '';\n  const last = out.lastName ?? out.last_name ?? '';\n  const joined = `${first} ${last}`.trim();\n  if (joined) out.contact_name = joined;\n}\n\nout.lead_source = out.lead_source ?? 'LinkedIn';\n\nreturn { json: out };"
+      }
+    },
+    {
+      "id": "7b2e5c08-9d41-4f36-8a70-4c1e6b9d2f85",
+      "name": "Has Contact Details?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [220, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f0e1d2c3-0000-4000-8000-000000000002",
+              "leftValue": "={{ $json.email ?? $json.emailAddress ?? $json.phone ?? $json.phoneNumber }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "The CRM rejects leads with no email and no phone. Catching it here keeps the run log clean and lets you route the rejects somewhere useful."
+    },
+    {
+      "id": "3c9e1b77-52aa-4d0e-8f43-6b1c9e2a4d82",
+      "name": "Send to CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [480, -100],
+      "parameters": {
+        "method": "POST",
+        "url": "https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "PASTE_YOUR_LINKEDIN_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Receive Lead": {
+      "main": [
+        [
+          {
+            "node": "Normalise Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise Fields": {
+      "main": [
+        [
+          {
+            "node": "Has Contact Details?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Contact Details?": {
+      "main": [
+        [
+          {
+            "node": "Send to CRM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {},
+  "pinData": {}
+}

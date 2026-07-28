@@ -1,0 +1,72 @@
+{
+  "name": "Instagram + Facebook Lead Ads → Call-Leads CRM",
+  "nodes": [
+    {
+      "id": "8f1a4c2e-0b3d-4a6f-9c11-2d5e7a9b0c31",
+      "name": "New Lead Ad Submission",
+      "type": "n8n-nodes-base.facebookLeadAdsTrigger",
+      "typeVersion": 1,
+      "position": [-160, 0],
+      "webhookId": "a1c7e9d3-4b52-4f80-91a6-0e3d5c8b7a24",
+      "parameters": {
+        "event": "newLead",
+        "page": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "form": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {
+          "simplifyOutput": true
+        }
+      },
+      "notes": "Instagram lead ads arrive here too — Instagram is a placement and the leads belong to the connected Facebook Page. Pick your Page and Form from the dropdowns after connecting your Facebook Lead Ads credential."
+    },
+    {
+      "id": "3c9e1b77-52aa-4d0e-8f43-6b1c9e2a4d80",
+      "name": "Send to CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [120, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "PASTE_YOUR_INSTAGRAM_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "notes": "Replace the x-api-key value with the key you generated in the CRM under Automations → Incoming. The CRM parses Meta's field format natively, so the whole payload is passed straight through with no mapping."
+    }
+  ],
+  "connections": {
+    "New Lead Ad Submission": {
+      "main": [
+        [
+          {
+            "node": "Send to CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "pinData": {}
+}

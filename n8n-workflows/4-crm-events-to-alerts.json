@@ -1,0 +1,127 @@
+{
+  "name": "Call-Leads CRM events → alerts",
+  "nodes": [
+    {
+      "id": "5a7c2e91-3f48-4b60-9d12-7e8a0b4c6d94",
+      "name": "CRM Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-280, 0],
+      "webhookId": "e4b0a3c6-9d28-4f71-8c54-3a6b8d0f2e15",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-event",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Copy this node's Production URL into the CRM under Automations → Outgoing → New webhook, and tick which events you want."
+    },
+    {
+      "id": "9e0b3d41-6a82-4f57-8c93-1b5d7e2a4c61",
+      "name": "Format Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-40, 0],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// The CRM posts { event, occurred_at, data }.\n// Build a human-readable alert and carry the useful bits forward.\n\nconst body = $json.body ?? $json;\nconst lead = body.data ?? {};\nconst event = body.event ?? 'unknown';\n\nconst inr = (n) => '\\u20B9' + Number(n || 0).toLocaleString('en-IN');\n\nconst headline = {\n  'lead.created': '\\uD83D\\uDFE2 New lead',\n  'lead.status_changed': '\\uD83D\\uDD04 Status changed',\n  'lead.assigned': '\\uD83D\\uDC64 Lead assigned',\n}[event] ?? event;\n\nconst lines = [\n  `${headline}: ${lead.company_name ?? 'Unknown company'}`,\n  lead.contact_name ? `Contact: ${lead.contact_name}` : '',\n  lead.phone ? `Phone: ${lead.phone}` : '',\n  lead.email ? `Email: ${lead.email}` : '',\n  lead.value ? `Value: ${inr(lead.value)}` : '',\n  lead.lead_source ? `Source: ${lead.lead_source}` : '',\n  event === 'lead.status_changed' && lead.previous_status\n    ? `Status: ${lead.previous_status} \\u2192 ${lead.status}`\n    : (lead.status ? `Status: ${lead.status}` : ''),\n].filter(Boolean);\n\nreturn {\n  json: {\n    event,\n    message: lines.join('\\n'),\n    company_name: lead.company_name ?? '',\n    value: Number(lead.value || 0),\n    priority: lead.priority ?? 'medium',\n    lead_id: lead.id ?? '',\n  },\n};"
+      }
+    },
+    {
+      "id": "7b2e5c08-9d41-4f36-8a70-4c1e6b9d2f86",
+      "name": "High Value or Urgent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [200, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f0e1d2c3-0000-4000-8000-000000000003",
+              "leftValue": "={{ $json.value }}",
+              "rightValue": 100000,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "f0e1d2c3-0000-4000-8000-000000000004",
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "urgent",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "notes": "Only shout about leads worth shouting about. Adjust the ₹1,00,000 threshold to suit, or delete this node to alert on everything."
+    },
+    {
+      "id": "3c9e1b77-52aa-4d0e-8f43-6b1c9e2a4d83",
+      "name": "Send Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [460, -100],
+      "parameters": {
+        "method": "POST",
+        "url": "PASTE_YOUR_NOTIFICATION_WEBHOOK_URL_HERE",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.message }) }}",
+        "options": {}
+      },
+      "notes": "Works as-is with a Slack incoming webhook or Google Chat. For WhatsApp, swap this for your provider's node (Twilio, Gupshup, WATI) and map $json.message into the message body. For email, replace with a Gmail or Send Email node."
+    }
+  ],
+  "connections": {
+    "CRM Event": {
+      "main": [
+        [
+          {
+            "node": "Format Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Message": {
+      "main": [
+        [
+          {
+            "node": "High Value or Urgent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Value or Urgent?": {
+      "main": [
+        [
+          {
+            "node": "Send Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {},
+  "pinData": {}
+}
