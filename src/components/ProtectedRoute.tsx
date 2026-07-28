@@ -17,9 +17,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     const checkAuth = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        // TEMP: Do not redirect, just allow access for debugging
+        if (!user) {
+          navigate("/login", { replace: true });
+          return;
+        }
       } catch (error) {
         console.error("Error checking authentication:", error);
+        navigate("/login", { replace: true });
       } finally {
         setIsLoading(false);
       }
