@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Loader, CheckCircle, Clock, XCircle, AlertCircle, Filter, Search, Mail, Phone as PhoneIcon, Briefcase, Upload, FileSpreadsheet, UserPlus, MoreHorizontal, Edit, Trash2, ChevronDown, Download, X, StickyNote, Calendar, MessageCircle, CalendarCheck } from "lucide-react";
+import { Plus, Loader, CheckCircle, Clock, XCircle, AlertCircle, Filter, Search, Mail, Phone as PhoneIcon, Briefcase, Upload, FileSpreadsheet, UserPlus, MoreHorizontal, Edit, Trash2, ChevronDown, Download, X, StickyNote, Calendar, MessageCircle, CalendarCheck, Sparkles } from "lucide-react";
+import AILeadGenerationDialog from "@/components/AILeadGenerationDialog";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -245,6 +246,7 @@ const ManagerLeads = () => {
   // Bulk delete states
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [showAILeadDialog, setShowAILeadDialog] = useState(false);
   
   // Bulk import states
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
@@ -1955,9 +1957,20 @@ const ManagerLeads = () => {
                   Export Excel
                 </Button>
 
+                {/* AI Generate Leads Button */}
+                <Button
+                  onClick={() => setShowAILeadDialog(true)}
+                  disabled={!selectedProject}
+                  className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
+                  title={!selectedProject ? "Select a project first" : "Generate leads with Gemini AI"}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  AI Generate Leads
+                </Button>
+
                 {/* Add Lead Button */}
-                <Button 
-                  onClick={() => setShowAddLeadModal(true)} 
+                <Button
+                  onClick={() => setShowAddLeadModal(true)}
                   disabled={!selectedProject}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 w-full sm:w-auto shrink-0"
                   title={!selectedProject ? "Select a project to add a lead. Switch to a specific project above." : "Add a new lead"}
@@ -4805,6 +4818,19 @@ const ManagerLeads = () => {
           </DialogContent>
         </Dialog>
       </main>
+
+      {/* AI Lead Generation Dialog */}
+      {selectedProject && (
+        <AILeadGenerationDialog
+          open={showAILeadDialog}
+          onClose={() => setShowAILeadDialog(false)}
+          projectId={selectedProject}
+          onLeadsImported={async () => {
+            const leadsRes = await import("@/lib/supabase").then(m => m.getLeads());
+            if (leadsRes?.data) setLeads(leadsRes.data as any[]);
+          }}
+        />
+      )}
     </div>
   );
 };
