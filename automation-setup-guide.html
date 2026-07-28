@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Call-Leads CRM — Automation Setup Guide</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink-2:#334155; --ink-3:#64748b; --ink-4:#94a3b8;
+    --line:#e2e8f0; --surface:#ffffff; --bg:#f8fafc;
+    --accent:#4f46e5; --accent-soft:#eef2ff;
+    --good:#047857; --good-soft:#ecfdf5;
+    --warn:#b45309; --warn-soft:#fffbeb;
+    --stop:#b91c1c; --stop-soft:#fef2f2;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#f1f5f9; --ink-2:#cbd5e1; --ink-3:#94a3b8; --ink-4:#64748b;
+      --line:#1e293b; --surface:#0f172a; --bg:#020617;
+      --accent:#a5b4fc; --accent-soft:#1e1b4b;
+      --good:#6ee7b7; --good-soft:#022c22;
+      --warn:#fcd34d; --warn-soft:#292006;
+      --stop:#fca5a5; --stop-soft:#2c0b0b;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:820px;margin:0 auto;padding:48px 24px 96px}
+  header{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:40px}
+  h1{font-size:32px;line-height:1.2;margin:0 0 10px;letter-spacing:-.02em}
+  .sub{color:var(--ink-3);margin:0;font-size:17px}
+  h2{
+    font-size:22px;margin:56px 0 6px;letter-spacing:-.01em;
+    padding-top:24px;border-top:1px solid var(--line);
+  }
+  h2:first-of-type{border-top:none;padding-top:0}
+  h3{font-size:17px;margin:32px 0 6px;color:var(--ink)}
+  p{margin:12px 0;color:var(--ink-2)}
+  a{color:var(--accent)}
+  code{
+    font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+    background:var(--accent-soft);color:var(--ink);
+    padding:2px 6px;border-radius:4px;
+  }
+  pre{
+    background:#0b1220;color:#e2e8f0;padding:16px 18px;border-radius:10px;
+    overflow-x:auto;font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;
+    margin:14px 0;
+  }
+  pre code{background:none;padding:0;color:inherit;font-size:inherit}
+  .card{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:20px 22px;margin:20px 0;
+  }
+  .note{border-left:3px solid var(--accent);background:var(--accent-soft);
+        border-radius:0 8px 8px 0;padding:14px 18px;margin:18px 0}
+  .warn{border-left:3px solid var(--warn);background:var(--warn-soft);
+        border-radius:0 8px 8px 0;padding:14px 18px;margin:18px 0}
+  .stop{border-left:3px solid var(--stop);background:var(--stop-soft);
+        border-radius:0 8px 8px 0;padding:14px 18px;margin:18px 0}
+  .good{border-left:3px solid var(--good);background:var(--good-soft);
+        border-radius:0 8px 8px 0;padding:14px 18px;margin:18px 0}
+  .note p,.warn p,.stop p,.good p{margin:6px 0}
+  .note strong,.warn strong,.stop strong,.good strong{color:var(--ink)}
+  ol,ul{color:var(--ink-2);padding-left:22px}
+  li{margin:8px 0}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px}
+  th{
+    text-align:left;padding:10px 12px;border-bottom:2px solid var(--line);
+    color:var(--ink-3);font-weight:600;font-size:13px;
+    text-transform:uppercase;letter-spacing:.04em;
+  }
+  td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+  .pill{
+    display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;
+    border-radius:999px;white-space:nowrap;
+  }
+  .p-good{background:var(--good-soft);color:var(--good)}
+  .p-warn{background:var(--warn-soft);color:var(--warn)}
+  .p-stop{background:var(--stop-soft);color:var(--stop)}
+  .steps{counter-reset:s;list-style:none;padding:0}
+  .steps>li{
+    counter-increment:s;position:relative;padding-left:44px;margin:22px 0;
+  }
+  .steps>li::before{
+    content:counter(s);position:absolute;left:0;top:-1px;
+    width:28px;height:28px;border-radius:50%;
+    background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:600;
+  }
+  .muted{color:var(--ink-3);font-size:14.5px}
+  footer{margin-top:72px;padding-top:24px;border-top:1px solid var(--line);
+         color:var(--ink-4);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Automation Setup Guide</h1>
+  <p class="sub">Connecting Instagram, LinkedIn and n8n to the Call-Leads CRM · sales.techvitta.in</p>
+</header>
+
+<p>Your CRM now has an <strong>Automations</strong> page at <code>/manager/automations</code>, plus two things running behind it: an endpoint that accepts leads from the outside world, and a dispatcher that fires every minute to push events out and run your rules.</p>
+
+<p>This guide covers what to click, in what order, and — just as importantly — which parts of the Instagram and LinkedIn integrations are genuinely hard so you can plan around them.</p>
+
+<div class="stop">
+  <p><strong>Read this first.</strong> The Instagram and LinkedIn official APIs both require platform approval that you do not control. Meta's is attainable. LinkedIn's is genuinely difficult and commonly takes months. The section on realistic options explains what to do in the meantime — there is a path that works today with no approval at all.</p>
+</div>
+
+<h2>1 · One-time setup</h2>
+
+<p>Two things need doing before anything can reach the CRM.</p>
+
+<h3>Turn off JWT verification on the intake endpoint</h3>
+
+<p>Supabase defaults to requiring one of its own auth tokens on every edge function. Your intake endpoint has its own authentication — the API key you generate below — so this default just gets in the way of external services calling it.</p>
+
+<ol class="steps">
+  <li>Open the <a href="https://supabase.com/dashboard/project/uvqlonqtlqypxqatgbih/functions">Supabase dashboard → Edge Functions</a>.</li>
+  <li>Click <strong>lead-intake</strong>, then its <strong>Settings</strong> tab.</li>
+  <li>Turn <strong>Verify JWT with legacy secret</strong> <em>off</em>. Save.</li>
+</ol>
+
+<div class="note">
+  <p><strong>Is that safe?</strong> Yes. Requests still have to present a valid <code>x-api-key</code>, which is stored only as a SHA-256 hash — the plaintext key exists nowhere in the database. Turning JWT off just stops Supabase demanding a <em>second</em>, unrelated credential on top of yours.</p>
+</div>
+
+<h3>Create your first API key</h3>
+
+<ol class="steps">
+  <li>Go to <strong>Automations → Incoming → New key</strong> in the CRM.</li>
+  <li>Name it after the source: <em>Instagram Lead Ads</em>, <em>LinkedIn Forms</em>, <em>Website contact form</em>.</li>
+  <li>Pick the project these leads belong to, and choose how they get assigned.</li>
+  <li><strong>Copy the key immediately.</strong> It is shown once and never again. If you lose it, delete the key and make another.</li>
+</ol>
+
+<p>Make one key per source rather than sharing one. That way every lead is tagged with where it came from, and if a key leaks you can revoke that one channel without breaking the others.</p>
+
+<h3>Your endpoint</h3>
+
+<pre><code>POST https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake
+
+Headers:
+  x-api-key: tvk_live_xxxxxxxxxxxxxxxxxxxx
+  Content-Type: application/json</code></pre>
+
+<p>Test it from any terminal:</p>
+
+<pre><code>curl -X POST 'https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake' \
+  -H 'x-api-key: YOUR_KEY_HERE' \
+  -H 'Content-Type: application/json' \
+  -d '{"company_name":"Test Co","contact_name":"Test User","email":"test@example.com","phone":"9876543210"}'</code></pre>
+
+<p>A success looks like <code>{"ok": true, "created": 1, ...}</code>, and the lead appears in your Leads page within seconds.</p>
+
+<h2>2 · What the endpoint accepts</h2>
+
+<p>It is deliberately forgiving, because every platform names its fields differently. You do not need to reshape payloads before sending them.</p>
+
+<table>
+  <thead><tr><th>It understands</th><th>Because</th></tr></thead>
+  <tbody>
+    <tr><td>Meta / Instagram Lead Ads</td><td>Flattens the <code>field_data: [{name, values}]</code> array automatically</td></tr>
+    <tr><td>LinkedIn Lead Gen Forms</td><td>Flattens <code>formResponse.answers</code> the same way</td></tr>
+    <tr><td>Flat JSON from n8n, Zapier, a website form</td><td>Matches field names ignoring case, spaces and underscores</td></tr>
+    <tr><td>Batches</td><td>Send an array, or <code>{"leads": [...]}</code></td></tr>
+  </tbody>
+</table>
+
+<p>Field names it recognises: <code>company_name</code>/<code>company</code>/<code>organisation</code>, <code>contact_name</code>/<code>full_name</code>/<code>name</code>, or <code>first_name</code>+<code>last_name</code>, <code>email</code>/<code>email_address</code>/<code>work_email</code>, <code>phone</code>/<code>mobile</code>/<code>phone_number</code>/<code>whatsapp</code>, plus <code>designation</code>/<code>job_title</code>, <code>city</code>, <code>state</code>, <code>country</code>, <code>industry</code>, <code>value</code>/<code>budget</code>, and <code>message</code>/<code>notes</code>/<code>requirement</code>.</p>
+
+<p>A lead needs a name or a company, <em>and</em> either an email or a phone. Anything less is rejected with a reason rather than silently dropped.</p>
+
+<div class="good">
+  <p><strong>Handled for you:</strong> Indian phone numbers are normalised to <code>+91XXXXXXXXXX</code> whether they arrive as <code>9848012345</code>, <code>09848012345</code> or <code>+91 98480 12345</code>. Duplicates are skipped by matching email or phone within the same project. Ad name, form name and campaign name are saved into the lead's notes so you can see which creative produced it.</p>
+</div>
+
+<h2>3 · Instagram</h2>
+
+<p>Here is the thing most guides get wrong: <strong>Instagram lead ads are not really an Instagram integration.</strong> Instagram is a placement, and the leads belong to the connected Facebook Page. You subscribe to the Page's <code>leadgen</code> webhook, and Instagram leads arrive through it alongside Facebook ones. n8n has no Instagram node at all, and does not need one.</p>
+
+<h3>What you need</h3>
+
+<ul>
+  <li>An Instagram Business or Creator account <strong>linked to a Facebook Page</strong> — this is a hard requirement.</li>
+  <li>A Meta app with the <code>leads_retrieval</code> and <code>pages_manage_ads</code> permissions.</li>
+  <li><strong>Meta App Review and Business Verification.</strong> Meta states plainly that lead retrieval requires review.</li>
+</ul>
+
+<div class="warn">
+  <p><strong>On timelines:</strong> Meta publishes no service-level commitment for App Review, and I would rather not invent one. Budget for days-to-weeks and expect at least one round of resubmission. Your submission will go far better if you have a working webhook already receiving test events, a screencast showing a user connecting their Page and a lead appearing, and a privacy policy that explicitly covers lead handling.</p>
+</div>
+
+<h3>The n8n workflow</h3>
+
+<ol class="steps">
+  <li>Add a <strong>Facebook Lead Ads Trigger</strong> node. It has exactly one event: <em>New lead</em>. Connect it with a Facebook Lead Ads OAuth2 credential and select your Page and form.</li>
+  <li>Add an <strong>HTTP Request</strong> node after it. Method <code>POST</code>, URL your intake endpoint, and under Headers add <code>x-api-key</code> with your Instagram key.</li>
+  <li>Set the body to <strong>JSON</strong> and pass the trigger output straight through — the intake endpoint understands Meta's field format natively, so no mapping node is needed.</li>
+  <li>Activate the workflow and submit a test lead through Meta's Lead Ads Testing Tool.</li>
+</ol>
+
+<div class="warn">
+  <p><strong>A trap worth knowing:</strong> Meta allows only <em>one</em> webhook URL per app. If you switch between n8n's test URL and its production URL, each overwrites the other. n8n's own advice is to unpublish the workflow while testing, then publish when you're done.</p>
+</div>
+
+<h3>Instagram DMs</h3>
+
+<p>Also possible, and easier than lead ads in one specific case. Meta's newer <em>Instagram API with Instagram Login</em> path needs the <code>instagram_business_manage_messages</code> permission and no linked Facebook Page. Critically, <strong>Standard Access requires no App Review</strong> as long as the app only serves accounts you own — which describes your situation exactly. Review is only needed for Advanced Access, i.e. if you were building a tool for other businesses.</p>
+
+<p>There's no Instagram DM node in n8n, so you'd use the <strong>Facebook Trigger</strong> node with the Instagram object subscribed to the <code>messages</code> field, then post to your intake endpoint.</p>
+
+<h2>4 · LinkedIn</h2>
+
+<p>I'll be straight with you: this is the hard one.</p>
+
+<p>Reading LinkedIn Lead Gen Forms programmatically requires the <strong>Lead Sync API</strong>, part of LinkedIn's Marketing Developer Platform, with the <code>r_marketing_leadgen_automation</code> scope. Access is by application and approval.</p>
+
+<div class="stop">
+  <p><strong>Set expectations accordingly.</strong> LinkedIn publishes no official timeline. Community-reported figures put four to eight weeks as the best case and explicitly the exception; three to four months is more typical, and six months or outright rejection is common. Applications get rejected for overlapping with LinkedIn's paid products, for anything resembling data enrichment or resale, and for weak privacy policies. LinkedIn does not guarantee it will tell you why.</p>
+</div>
+
+<p>Also worth knowing: <strong>the n8n LinkedIn node only creates posts.</strong> It cannot read lead forms. If you do get approved, you wire Lead Sync to a plain n8n <strong>Webhook</strong> node — which LinkedIn requires to be HTTPS, publicly reachable, unauthenticated, and able to answer its challenge within three seconds. LinkedIn re-validates every two hours and blocks your endpoint after three consecutive failures, so verify the <code>X-LI-Signature</code> header rather than adding auth.</p>
+
+<h3>What I'd actually do instead</h3>
+
+<p><strong>Use Zapier as the bridge.</strong> Zapier already holds LinkedIn approval, so you don't need your own. Its LinkedIn Lead Gen Forms connector has instant triggers for both organic and sponsored form responses, and all it asks for is a LinkedIn ad account with access to the form. Chain it into your CRM with a Zapier webhook action pointed at your intake endpoint, or straight into an n8n Webhook node.</p>
+
+<p>This takes an afternoon rather than a quarter, and you can always migrate to direct API access later if approval comes through.</p>
+
+<h2>5 · The option that works today with no approval</h2>
+
+<p>If you want leads flowing this week, skip native instant forms entirely.</p>
+
+<p>Run your Instagram and LinkedIn ads to a <strong>landing page or link-in-bio form</strong> instead. Use n8n's <strong>Form Trigger</strong> node — n8n hosts the form page for you and supports multi-page forms and prefilled fields — or put Typeform, Tally or your own page in front of a plain <strong>Webhook</strong> node. Either way, post the result to your intake endpoint.</p>
+
+<p>Zero platform review, working in an hour. The trade-off is real: native in-app instant forms convert better because they pre-fill the user's details and never leave the app. But a working pipeline at a lower conversion rate beats a perfect one that's still in review.</p>
+
+<div class="warn">
+  <p><strong>The 90-day cliff.</strong> If you're falling back on CSV exports from Meta Leads Center or LinkedIn Campaign Manager while you wait for approval, note that <strong>Meta permanently deletes lead data after 90 days</strong> — not recoverable by support, API or download. LinkedIn is reported to do the same, though I could only confirm that through third-party sources. Export on a schedule you'll actually keep to.</p>
+</div>
+
+<h2>6 · Sending events out to n8n</h2>
+
+<p>The flow also runs the other way. Under <strong>Automations → Outgoing</strong>, add your n8n Webhook node's URL and pick which events should reach it: lead created, status changed, or assigned.</p>
+
+<p>Every delivery carries an <code>X-Techvitta-Signature</code> header — an HMAC-SHA256 of the request body, keyed with that webhook's secret. Verify it in n8n with a Crypto node and reject mismatches, so nobody can forge events at your workflow. The secret is copyable from the Automations page.</p>
+
+<pre><code>{
+  "event": "lead.created",
+  "occurred_at": "2026-07-28T09:14:22.418Z",
+  "data": {
+    "id": "…", "company_name": "Sunrise Textiles",
+    "contact_name": "Ramesh Kumar", "email": "…", "phone": "+919848012345",
+    "status": "new", "value": 0, "priority": "medium",
+    "lead_source": "Instagram", "project_id": "…", "assigned_to": "…"
+  }
+}</code></pre>
+
+<p>Useful things to hang off this: post new high-value leads to a WhatsApp or Slack group, add a row to a Google Sheet for the finance team, send a welcome email, or trigger an enrichment lookup and write the result back.</p>
+
+<h2>7 · Rules that run inside the CRM</h2>
+
+<p>For anything that doesn't need an external service, use <strong>Automations → Rules</strong> instead of n8n. No extra tool to run, pay for, or keep online. The dispatcher checks every minute; time-based rules run once a day.</p>
+
+<table>
+  <thead><tr><th>Triggers</th><th>Actions</th></tr></thead>
+  <tbody>
+    <tr><td>A lead is created</td><td>Auto-assign to the least busy rep</td></tr>
+    <tr><td>A lead's status changes (optionally to a specific status)</td><td>Assign to a specific person</td></tr>
+    <tr><td>A lead is assigned</td><td>Set status or priority</td></tr>
+    <tr><td>A follow-up date falls due</td><td>Schedule a follow-up N days out</td></tr>
+    <tr><td>A lead sits untouched for N days</td><td>Add a note (supports <code>{{company_name}}</code> style placeholders)</td></tr>
+    <tr><td>Daily, as a digest</td><td>POST to a webhook</td></tr>
+  </tbody>
+</table>
+
+<h3>Three worth setting up on day one</h3>
+
+<div class="card">
+  <p><strong>Nothing sits unassigned.</strong><br>
+  <span class="muted">When a lead is created → auto-assign to the least busy rep. Tick "only unassigned leads" so it never overrides a manual assignment.</span></p>
+
+  <p style="margin-top:18px"><strong>Nothing goes cold silently.</strong><br>
+  <span class="muted">When a lead is untouched for 7 days → add a note, and schedule a follow-up 1 day out so it surfaces on the Follow-ups page.</span></p>
+
+  <p style="margin-top:18px"><strong>You see the pipeline without logging in.</strong><br>
+  <span class="muted">Daily digest → POST to an n8n webhook that formats it and sends it to your WhatsApp or email. The payload includes new leads in the last 24 hours, counts by status, and total open pipeline value.</span></p>
+</div>
+
+<p>Round-robin assignment balances by <em>current open workload</em> rather than strict rotation, so it self-corrects — someone who closes or loses deals quickly gets more new leads, and someone buried in open work gets fewer.</p>
+
+<h2>8 · When something doesn't work</h2>
+
+<p>The <strong>Log</strong> tab records every intake request, webhook delivery and rule run, with the reason for anything that failed. Start there. The <strong>Run now</strong> button forces the dispatcher immediately rather than waiting for the next minute.</p>
+
+<table>
+  <thead><tr><th>Symptom</th><th>Usually means</th></tr></thead>
+  <tbody>
+    <tr><td><code>401 Invalid or inactive API key</code></td><td>Key mistyped, or toggled off on the Incoming tab</td></tr>
+    <tr><td>A 401 you can't explain, with a correct key</td><td>JWT verification is still on — see section 1</td></tr>
+    <tr><td><code>No email or phone found in payload</code></td><td>The form isn't collecting one, or uses an unusual field name</td></tr>
+    <tr><td><code>No project_id …</code></td><td>The API key has no project set; edit it or send <code>project_id</code> in the body</td></tr>
+    <tr><td>Leads land but aren't assigned</td><td>Assignment mode is "leave unassigned", or no users have the salesman role</td></tr>
+    <tr><td>Webhook shows failures</td><td>Check the URL is reachable and the n8n workflow is <em>active</em>, not just saved</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  <p>Built for Techvitta · sales.techvitta.in · July 2026</p>
+  <p>Platform behaviour on Meta and LinkedIn changes without much notice. Where this guide states something I could not verify from an official source — notably Meta's review duration and LinkedIn's retention window — it says so rather than guessing.</p>
+</footer>
+
+</div>
+</body>
+</html>
