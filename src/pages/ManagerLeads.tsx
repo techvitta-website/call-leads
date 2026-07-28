@@ -48,6 +48,8 @@ const ManagerLeads = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [softwareCategoryFilter, setSoftwareCategoryFilter] = useState<string>("all");
+  const [industryFilter, setIndustryFilter] = useState<string>("all");
   const [countryFilter, setCountryFilter] = useState<string>("");
   const [stateFilter, setStateFilter] = useState<string>("");
   const [cityFilter, setCityFilter] = useState<string>("");
@@ -445,6 +447,9 @@ const ManagerLeads = () => {
         lead_source: leadForm.lead_source?.trim() || null,
         data_source: leadForm.data_source?.trim() || null,
         lead_score: leadForm.lead_score ? parseInt(leadForm.lead_score) : null,
+        priority: (leadForm as any).priority || 'medium',
+        software_category: (leadForm as any).software_category || null,
+        industry: (leadForm as any).industry || null,
         next_followup_date: leadForm.next_followup_date || null,
         followup_notes: leadForm.followup_notes?.trim() || null,
         repeat_followup: leadForm.repeat_followup || false,
@@ -1325,10 +1330,19 @@ const ManagerLeads = () => {
     const leadSource = (lead as any).lead_source || (lead as any).source || "Direct";
     const matchesSource = sourceFilter === "all" || leadSource === sourceFilter;
     
-    // Priority filter (based on lead_score)
-    const priority = (lead as any).lead_score || "warm";
-    const priorityStr = typeof priority === 'number' ? (priority >= 70 ? "hot" : priority >= 40 ? "warm" : "cold") : String(priority).toLowerCase();
-    const matchesPriority = priorityFilter === "all" || priorityStr === priorityFilter;
+    // Priority filter (uses the priority column: low/medium/high/urgent)
+    const leadPriority = String((lead as any).priority || "medium").toLowerCase();
+    const matchesPriority = priorityFilter === "all" || leadPriority === priorityFilter;
+
+    // Software category filter
+    const leadSoftwareCategory = String((lead as any).software_category || "").toLowerCase();
+    const matchesSoftwareCategory = softwareCategoryFilter === "all" || !softwareCategoryFilter ||
+      leadSoftwareCategory === softwareCategoryFilter.toLowerCase();
+
+    // Industry filter
+    const leadIndustry = String((lead as any).industry || "").toLowerCase();
+    const matchesIndustry = industryFilter === "all" || !industryFilter ||
+      leadIndustry === industryFilter.toLowerCase();
 
     // Location filters
     const matchesCountry = !countryFilter || ((lead as any).country || "").toLowerCase().includes(countryFilter.toLowerCase());
@@ -1374,6 +1388,8 @@ const ManagerLeads = () => {
       matchesProject &&
       matchesSource &&
       matchesPriority &&
+      matchesSoftwareCategory &&
+      matchesIndustry &&
       matchesCountry &&
       matchesState &&
       matchesCity &&
@@ -1660,7 +1676,7 @@ const ManagerLeads = () => {
                   >
                     <Filter className="w-4 h-4" />
                     Advanced Filters
-                    {(statusFilter !== "all" || assigneeFilter !== "all" || sourceFilter !== "all" || priorityFilter !== "all") && (
+                    {(statusFilter !== "all" || assigneeFilter !== "all" || sourceFilter !== "all" || priorityFilter !== "all" || softwareCategoryFilter !== "all" || industryFilter !== "all") && (
                       <Badge className="bg-indigo-100 text-indigo-700 border-0 text-xs px-1.5 py-0.5 ml-1">Active</Badge>
                     )}
                     <ChevronDown className="w-3.5 h-3.5" />
@@ -1696,9 +1712,60 @@ const ManagerLeads = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Priorities</SelectItem>
-                          <SelectItem value="hot">Hot</SelectItem>
-                          <SelectItem value="warm">Warm</SelectItem>
-                          <SelectItem value="cold">Cold</SelectItem>
+                          <SelectItem value="urgent">🔴 Urgent</SelectItem>
+                          <SelectItem value="high">🟠 High</SelectItem>
+                          <SelectItem value="medium">🟡 Medium</SelectItem>
+                          <SelectItem value="low">🟢 Low</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Software Category Filter */}
+                    <div>
+                      <label className="text-xs font-medium text-slate-700 mb-1.5 block">Software Category</label>
+                      <Select value={softwareCategoryFilter} onValueChange={setSoftwareCategoryFilter}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="All Categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Categories</SelectItem>
+                          <SelectItem value="erp">ERP</SelectItem>
+                          <SelectItem value="crm">CRM</SelectItem>
+                          <SelectItem value="hrms">HRMS</SelectItem>
+                          <SelectItem value="accounting">Accounting</SelectItem>
+                          <SelectItem value="inventory">Inventory</SelectItem>
+                          <SelectItem value="pos">POS</SelectItem>
+                          <SelectItem value="ecommerce">E-Commerce</SelectItem>
+                          <SelectItem value="custom">Custom Development</SelectItem>
+                          <SelectItem value="saas">SaaS</SelectItem>
+                          <SelectItem value="mobile">Mobile App</SelectItem>
+                          <SelectItem value="website">Website</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Industry Filter */}
+                    <div>
+                      <label className="text-xs font-medium text-slate-700 mb-1.5 block">Industry</label>
+                      <Select value={industryFilter} onValueChange={setIndustryFilter}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="All Industries" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Industries</SelectItem>
+                          <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                          <SelectItem value="retail">Retail</SelectItem>
+                          <SelectItem value="healthcare">Healthcare</SelectItem>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="construction">Construction</SelectItem>
+                          <SelectItem value="logistics">Logistics</SelectItem>
+                          <SelectItem value="hospitality">Hospitality</SelectItem>
+                          <SelectItem value="finance">Finance</SelectItem>
+                          <SelectItem value="it">IT / Technology</SelectItem>
+                          <SelectItem value="real_estate">Real Estate</SelectItem>
+                          <SelectItem value="agriculture">Agriculture</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1844,6 +1911,8 @@ const ManagerLeads = () => {
                           setAssigneeFilter("all");
                           setSourceFilter("all");
                           setPriorityFilter("all");
+                          setSoftwareCategoryFilter("all");
+                          setIndustryFilter("all");
                           setCountryFilter("");
                           setStateFilter("");
                           setCityFilter("");
@@ -3018,6 +3087,58 @@ const ManagerLeads = () => {
                         onChange={(e) => setLeadForm({ ...leadForm, product_group: e.target.value })}
                         placeholder="Product group"
                       />
+                    </div>
+                    <div>
+                      <Label htmlFor="software-category">Software Category</Label>
+                      <Select value={(leadForm as any).software_category || "other"} onValueChange={(v) => setLeadForm({ ...leadForm, software_category: v } as any)}>
+                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="erp">ERP</SelectItem>
+                          <SelectItem value="crm">CRM</SelectItem>
+                          <SelectItem value="hrms">HRMS</SelectItem>
+                          <SelectItem value="accounting">Accounting</SelectItem>
+                          <SelectItem value="inventory">Inventory</SelectItem>
+                          <SelectItem value="pos">POS</SelectItem>
+                          <SelectItem value="ecommerce">E-Commerce</SelectItem>
+                          <SelectItem value="custom">Custom Development</SelectItem>
+                          <SelectItem value="saas">SaaS</SelectItem>
+                          <SelectItem value="mobile">Mobile App</SelectItem>
+                          <SelectItem value="website">Website</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="industry">Industry</Label>
+                      <Select value={(leadForm as any).industry || "other"} onValueChange={(v) => setLeadForm({ ...leadForm, industry: v } as any)}>
+                        <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                          <SelectItem value="retail">Retail</SelectItem>
+                          <SelectItem value="healthcare">Healthcare</SelectItem>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="construction">Construction</SelectItem>
+                          <SelectItem value="logistics">Logistics</SelectItem>
+                          <SelectItem value="hospitality">Hospitality</SelectItem>
+                          <SelectItem value="finance">Finance</SelectItem>
+                          <SelectItem value="it">IT / Technology</SelectItem>
+                          <SelectItem value="real_estate">Real Estate</SelectItem>
+                          <SelectItem value="agriculture">Agriculture</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="priority-select">Priority</Label>
+                      <Select value={(leadForm as any).priority || "medium"} onValueChange={(v) => setLeadForm({ ...leadForm, priority: v } as any)}>
+                        <SelectTrigger><SelectValue placeholder="Select priority" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="urgent">🔴 Urgent</SelectItem>
+                          <SelectItem value="high">🟠 High</SelectItem>
+                          <SelectItem value="medium">🟡 Medium</SelectItem>
+                          <SelectItem value="low">🟢 Low</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label htmlFor="lead-source">Lead Source</Label>
