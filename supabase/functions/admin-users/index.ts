@@ -90,12 +90,36 @@ Deno.serve(async (req) => {
   const action = String(body?.action ?? "");
 
   // ── Helpers ──────────────────────────────────────────────────
+  const listAuthUsers = async () => {
+    const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    return data?.users ?? [];
+  };
+
+  const isSuspended = (a: any) => {
+    const until = a?.banned_until ? new Date(a.banned_until).getTime() : 0;
+    return until > Date.now();
+  };
+
+  /**
+   * Owners who can actually sign in right now.
+   *
+   * Counting profile rows alone is wrong: a row in `users` with no matching
+   * auth account cannot log in, and neither can a suspended one. Seed and
+   * demo data leaves exactly those rows behind, so a naive count reports two
+   * owners where there is really one — and then happily lets you demote the
+   * only real one.
+   */
   const ownerCount = async () => {
-    const { count } = await admin
+    const { data: ownerRows } = await admin
       .from("users")
-      .select("id", { count: "exact", head: true })
+      .select("id")
       .eq("role", "owner");
-    return count ?? 0;
+
+    const ownerIds = new Set((ownerRows ?? []).map((r: any) => r.id));
+    if (ownerIds.size === 0) return 0;
+
+    const auth = await listAuthUsers();
+    return auth.filter((u: any) => ownerIds.has(u.id) && !isSuspended(u)).length;
   };
 
   const loadTarget = async (id: string) => {
@@ -124,29 +148,43 @@ Deno.serve(async (req) => {
         .order("email");
 
       // Merge in auth state so the UI can show suspended / never-signed-in.
-      const { data: authList } = await admin.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
-
-      const authById = new Map(
-        (authList?.users ?? []).map((u: any) => [u.id, u]),
-      );
+      const authUsers = await listAuthUsers();
+      const authById = new Map(authUsers.map((u: any) => [u.id, u]));
 
       const users = (profiles ?? []).map((p: any) => {
         const a: any = authById.get(p.id);
-        const bannedUntil = a?.banned_until ? new Date(a.banned_until) : null;
         return {
           ...p,
           last_sign_in_at: a?.last_sign_in_at ?? null,
           email_confirmed: Boolean(a?.email_confirmed_at),
           // Supabase stores a ban as a future timestamp, not a boolean.
-          suspended: Boolean(bannedUntil && bannedUntil.getTime() > Date.now()),
+          suspended: isSuspended(a),
+          // No auth account means the row is a leftover that cannot sign in.
+          // The UI has to say so, or a dead row reads as a working account.
           has_auth_account: Boolean(a),
         };
       });
 
-      return json({ ok: true, me: { id: me.id, role: myRole }, users });
+      // Auth accounts with no profile row are the opposite hazard: they can
+      // authenticate but carry no role, so they never appear in any list and
+      // this function refuses them. Surface them rather than leave them
+      // invisible.
+      const profileIds = new Set((profiles ?? []).map((p: any) => p.id));
+      const orphanLogins = authUsers
+        .filter((u: any) => !profileIds.has(u.id))
+        .map((u: any) => ({
+          id: u.id,
+          email: u.email,
+          last_sign_in_at: u.last_sign_in_at ?? null,
+          suspended: isSuspended(u),
+        }));
+
+      return json({
+        ok: true,
+        me: { id: me.id, role: myRole },
+        users,
+        orphan_logins: orphanLogins,
+      });
     }
 
     // ── CREATE ─────────────────────────────────────────────────
@@ -213,6 +251,36 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── DELETE AN ORPHAN LOGIN ─────────────────────────────────
+    // An auth account with no profile row. It has no role, so it cannot be
+    // administered through the normal path — the lookup below would 404 —
+    // but it can still authenticate, which is exactly why it needs removing.
+    if (action === "delete_orphan_login") {
+      if (myRole !== "owner") {
+        return json({ error: "Only an owner can remove a stray login." }, 403);
+      }
+
+      const id = String(body?.userId ?? "");
+      if (!id) return json({ error: "No user specified." }, 400);
+      if (id === me.id) return json({ error: "You cannot delete your own account." }, 409);
+
+      // Refuse if a profile exists — that is a normal account and must go
+      // through `delete`, which checks lead ownership first.
+      const { data: existing } = await admin
+        .from("users")
+        .select("id")
+        .eq("id", id)
+        .maybeSingle();
+      if (existing) {
+        return json({ error: "That account has a profile — remove it from the list instead." }, 409);
+      }
+
+      const { error } = await admin.auth.admin.deleteUser(id);
+      if (error && !/not.?found/i.test(String(error.message ?? error))) throw error;
+
+      return json({ ok: true, message: "Stray login removed." });
+    }
+
     // Everything below needs a target.
     const targetId = String(body?.userId ?? "");
     if (!targetId) return json({ error: "No user specified." }, 400);
@@ -269,7 +337,7 @@ Deno.serve(async (req) => {
       // Don't strand the system with no owner.
       if (targetRole === "owner" && newRole !== "owner" && (await ownerCount()) <= 1) {
         return json(
-          { error: "This is the only owner account. Promote someone else to owner first." },
+          { error: "This is the only owner who can sign in. Promote someone else to owner first." },
           409,
         );
       }
@@ -322,7 +390,7 @@ Deno.serve(async (req) => {
         return json({ error: "You cannot suspend your own login." }, 409);
       }
       if (!active && targetRole === "owner" && (await ownerCount()) <= 1) {
-        return json({ error: "This is the only owner account — suspending it would lock everyone out." }, 409);
+        return json({ error: "This is the only owner who can sign in — suspending it would lock everyone out." }, 409);
       }
 
       const { error } = await admin.auth.admin.updateUserById(targetId, {
@@ -344,7 +412,7 @@ Deno.serve(async (req) => {
         return json({ error: "You cannot delete your own account." }, 409);
       }
       if (targetRole === "owner" && (await ownerCount()) <= 1) {
-        return json({ error: "This is the only owner account." }, 409);
+        return json({ error: "This is the only owner who can sign in." }, 409);
       }
 
       // Leads point at users; orphaning them silently would lose ownership
@@ -371,8 +439,12 @@ Deno.serve(async (req) => {
       }
 
       await admin.from("users").delete().eq("id", targetId);
+
+      // A leftover profile row has no auth account to delete, and the admin
+      // API errors rather than no-ops on a missing user. Removing the row is
+      // still a success — don't fail the whole request over it.
       const { error } = await admin.auth.admin.deleteUser(targetId);
-      if (error) throw error;
+      if (error && !/not.?found/i.test(String(error.message ?? error))) throw error;
 
       return json({ ok: true, message: `${target.email} has been removed.` });
     }

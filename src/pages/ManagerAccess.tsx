@@ -93,6 +93,7 @@ export default function ManagerAccess() {
   const { userRole } = useAuth();
 
   const [users, setUsers] = useState<any[]>([]);
+  const [orphans, setOrphans] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [meRole, setMeRole] = useState<Role | null>(null);
   const [meId, setMeId] = useState<string>("");
@@ -141,6 +142,7 @@ export default function ManagerAccess() {
     try {
       const data = await call({ action: "list" });
       setUsers(data.users ?? []);
+      setOrphans(data.orphan_logins ?? []);
       setMeRole(data.me?.role ?? null);
       setMeId(data.me?.id ?? "");
     } catch (e: any) {
@@ -341,6 +343,14 @@ export default function ManagerAccess() {
                           Suspended
                         </Badge>
                       )}
+                      {/* A row with no auth account looks like a working
+                          account in every other respect — say plainly that
+                          it isn't one. */}
+                      {u.has_auth_account === false && (
+                        <Badge className="bg-slate-200 text-xs text-slate-700">
+                          No login — leftover record
+                        </Badge>
+                      )}
                     </div>
                     <div className="space-y-0.5 text-xs text-slate-500">
                       <div>{u.email}</div>
@@ -444,6 +454,55 @@ export default function ManagerAccess() {
             );
           })}
         </div>
+
+        {/* Sign-ins that belong to nobody. They authenticate but carry no
+            role, so they show up nowhere else in the app. */}
+        {isOwner && orphans.length > 0 && (
+          <Card className="mt-6 border-amber-200 bg-amber-50 p-5">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-700" />
+              <span className="font-semibold text-amber-900">
+                {orphans.length} sign-in{orphans.length === 1 ? "" : "s"} with no profile
+              </span>
+            </div>
+            <p className="mb-3 text-sm text-amber-800">
+              These can still sign in, but they have no role, so they land nowhere
+              and appear in no list. Either give them a role or remove them.
+            </p>
+            <div className="space-y-2">
+              {orphans.map((o) => (
+                <div
+                  key={o.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white p-2"
+                >
+                  <div className="text-sm">
+                    <span className="font-medium text-slate-900">{o.email}</span>
+                    <span className="ml-2 text-xs text-slate-500">
+                      {o.last_sign_in_at
+                        ? `last signed in ${new Date(o.last_sign_in_at).toLocaleDateString()}`
+                        : "never signed in"}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy === `orphan-${o.id}`}
+                    onClick={() =>
+                      run(`orphan-${o.id}`, {
+                        action: "delete_orphan_login",
+                        userId: o.id,
+                      })
+                    }
+                    className="h-8 gap-1.5 text-xs text-red-600"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Remove login
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* ── Add person ─────────────────────────────────────── */}
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
