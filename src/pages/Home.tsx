@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase, signInWithEmail, signUpWithEmail } from "@/lib/supabase";
 import { formatCurrencyCompact } from "@/utils/currency";
 import type { Role as UserRole } from "@/lib/roles";
+import { homeFor, normalizeRole } from "@/lib/roles";
 
 
 const Home = () => {
@@ -37,12 +38,7 @@ const Home = () => {
             .single();
           if (userData?.role) {
             const role = String(userData.role).toLowerCase();
-            const dashboardRoute: Record<string, string> = {
-              owner: '/owner',
-              manager: '/manager',
-              salesman: '/salesman',
-            };
-            navigate(dashboardRoute[role] || '/owner', { replace: true });
+            navigate(homeFor(normalizeRole(role)), { replace: true });
           }
         }
       } catch {
@@ -91,12 +87,9 @@ const Home = () => {
           setSuccessMessage("Account created successfully! Logging you in...");
           setTimeout(() => {
             const role = String(selectedRole || '').toLowerCase() as UserRole;
-            const dashboardRoute = {
-              owner: '/owner',
-              manager: '/manager',
-              salesman: '/salesman',
-            };
-            navigate(dashboardRoute[role] || '/', { replace: true });
+            // Falling back to '/' sent the user straight back to this page,
+            // which then redirected again — a visible bounce on every login.
+            navigate(homeFor(normalizeRole(role)), { replace: true });
           }, 1500);
         }
       } else {
@@ -119,12 +112,9 @@ const Home = () => {
 
           if (userData) {
             const role = String(userData.role || '').toLowerCase() as UserRole;
-            const dashboardRoute = {
-              owner: '/owner',
-              manager: '/manager',
-              salesman: '/salesman',
-            };
-            navigate(dashboardRoute[role] || '/', { replace: true });
+            // Falling back to '/' sent the user straight back to this page,
+            // which then redirected again — a visible bounce on every login.
+            navigate(homeFor(normalizeRole(role)), { replace: true });
           }
         }
       }

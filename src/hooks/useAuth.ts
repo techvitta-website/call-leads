@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase, createUserSession, updateUserSessionLogout } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import type { Role as UserRole } from '@/lib/roles';
+import { homeFor } from '@/lib/roles';
 
 
 const normalizeRole = (value: unknown): UserRole | null => {
@@ -165,12 +166,7 @@ export const useAuth = () => {
           }
 
           // Redirect to appropriate dashboard
-          const dashboardRoute = {
-            owner: '/owner',
-            manager: '/manager',
-            salesman: '/salesman',
-          };
-          navigate(dashboardRoute[resolvedRole as UserRole] || '/');
+          navigate(homeFor(resolvedRole));
         }
       }
 
@@ -217,12 +213,7 @@ export const useAuth = () => {
         }
         
         // Redirect to appropriate dashboard
-        const dashboardRoute = {
-          owner: '/owner',
-          manager: '/manager',
-          salesman: '/salesman',
-        };
-        navigate(dashboardRoute[normalized as UserRole] || '/login');
+        navigate(homeFor(normalized));
       }
 
       return true;

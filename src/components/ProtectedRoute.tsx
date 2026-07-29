@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader, ShieldAlert } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { normalizeRole, homeFor, ROLE_LABEL, type Role } from "@/lib/roles";
+import { homeFor, ROLE_LABEL, type Role } from "@/lib/roles";
+import { getCurrentRole } from "@/lib/currentRole";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -43,18 +44,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allow 
           return;
         }
 
-        // Read the role from the database rather than the token. A JWT can
-        // carry metadata from before a demotion; the row cannot.
-        const { data } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        const role =
-          normalizeRole(data?.role) ??
-          normalizeRole(user.user_metadata?.role) ??
-          null;
+        // Read the role from the database rather than the token — a JWT can
+        // carry metadata from before a demotion. Shared with the sidebar and
+        // the page beneath, so this costs one request per load, not three.
+        const role = await getCurrentRole();
 
         if (cancelled) return;
         setState(

@@ -43,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { normalizeRole, ROLE_LABEL, ADMIN_ONLY, STAFF, EVERYONE, SALES_SCOPE, type Role } from "@/lib/roles";
+import { getCurrentRole } from "@/lib/currentRole";
 
 interface SidebarProps {
   role?: Role | string;
@@ -182,21 +183,13 @@ const DashboardSidebar = ({ role }: SidebarProps) => {
 
     const fetchUser = async () => {
       const { data } = await supabase.auth.getUser();
-      const user = data?.user;
       if (cancelled) return;
-      setUserEmail(user?.email || "User");
-      if (!user) return;
+      setUserEmail(data?.user?.email || "User");
+      if (!data?.user) return;
 
-      const { data: profile } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (cancelled) return;
-      setActualRole(
-        normalizeRole(profile?.role) ?? normalizeRole(user.user_metadata?.role),
-      );
+      // Shared with the route guard, so this is usually already resolved.
+      const role = await getCurrentRole();
+      if (!cancelled) setActualRole(role);
     };
 
     fetchUser();
