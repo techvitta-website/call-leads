@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super Admin &amp; Security Hardening — sales.techvitta.in</title>
+<style>
+  :root{--ink:#0f172a;--ink2:#334155;--muted:#64748b;--line:#e2e8f0;
+        --bg:#f8fafc;--accent:#047857;--crit:#b91c1c;--critbg:#fef2f2;
+        --warn:#b45309;--warnbg:#fffbeb;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink2);
+       font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 22px 80px}
+  header{border-bottom:3px solid var(--accent);padding-bottom:18px;margin-bottom:32px}
+  h1{color:var(--ink);font-size:30px;margin:0 0 6px;letter-spacing:-.02em}
+  header p{margin:0;color:var(--muted)}
+  h2{color:var(--ink);font-size:20px;margin:40px 0 14px;padding-bottom:8px;
+     border-bottom:1px solid var(--line)}
+  h3{color:var(--ink);font-size:16px;margin:26px 0 8px}
+  p{margin:0 0 14px}
+  code{background:#eef2f7;padding:2px 6px;border-radius:4px;color:var(--ink);
+       font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+  pre{background:#0f172a;color:#e2e8f0;padding:14px 16px;border-radius:8px;
+      overflow-x:auto;font:13px/1.5 ui-monospace,Menlo,monospace}
+  table{width:100%;border-collapse:collapse;margin:16px 0 22px;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink);font-weight:600;background:#f1f5f9;font-size:14px}
+  td:first-child{white-space:nowrap}
+  .crit{background:var(--critbg);border:1px solid #fecaca;border-left:4px solid var(--crit);
+        border-radius:8px;padding:18px 22px;margin:22px 0}
+  .crit strong{color:var(--crit)}
+  .note{background:var(--warnbg);border:1px solid #fde68a;border-left:4px solid var(--warn);
+        border-radius:8px;padding:16px 20px;margin:20px 0}
+  .note strong{color:var(--warn)}
+  .ok{color:var(--accent);font-weight:600}
+  .no{color:var(--crit)}
+  .pill{display:inline-block;background:#ecfdf5;border:1px solid #a7f3d0;color:var(--accent);
+        border-radius:20px;padding:2px 12px;font-size:13px;font-weight:600}
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);
+         color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Super Admin &amp; Security Hardening</h1>
+  <p>sales.techvitta.in · deployed 29 July 2026</p>
+</header>
+
+<p>
+  <code>venkatesh@techvitta.in</code> is now a <span class="pill">Super Admin</span> —
+  a fourth role above Owner, with access to every page in the application. Getting
+  there surfaced a serious hole, which is the first thing below.
+</p>
+
+<h2>The critical finding</h2>
+
+<div class="crit">
+  <p><strong>Anyone with a login could make themselves a super admin.</strong></p>
+  <p>
+    The database rule controlling profile edits allowed you to update your own row.
+    That is reasonable for changing your name or phone number — but the rule said
+    nothing about <em>which</em> columns, and a person's role lives in that same row.
+    So any salesperson could send one request straight past the application:
+  </p>
+  <pre>PATCH /rest/v1/users?id=eq.&lt;their own id&gt;
+{"role": "super_admin"}</pre>
+  <p>
+    I tested this against your live database. It returned success and the role
+    changed. Every permission check I had built into the app was bypassable this
+    way, because the browser never had to go through the app at all.
+  </p>
+  <p>
+    It is now closed with two independent defences: the database no longer grants
+    ordinary users permission to write the role, account-status or lead-routing
+    columns at all, and a separate rule rejects any such change regardless of what
+    permissions say. Both would have to fail for the hole to reopen. Editing your
+    own name and phone number still works normally.
+  </p>
+</div>
+
+<h2>Why the owner needed fixing before a tier could sit above it</h2>
+
+<p>
+  Owner was nominally the top role but wired as the weakest. Three separate causes:
+</p>
+
+<table>
+  <tbody>
+    <tr>
+      <td><strong>Ten pages</strong></td>
+      <td>Clients, Quotations, Invoices, Receipts, Suppliers, Purchase Orders, Won
+          Deals, Lost Deals, Deal Stages and Follow-ups each checked for
+          <em>manager exactly</em> and redirected an owner away. The landing page
+          then bounced them back, so it looped silently with no explanation.</td>
+    </tr>
+    <tr>
+      <td><strong>36 database rules</strong></td>
+      <td>Each listed the permitted roles by name. A new tier would have arrived
+          with <em>less</em> database access than a manager. All 36 now ask a single
+          shared function instead, so the hierarchy is defined in one place.</td>
+    </tr>
+    <tr>
+      <td><strong>The sidebar</strong></td>
+      <td>Owner had seven menu items to the manager's ten, with no route to projects,
+          automations, sequences, invoicing or purchasing.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Who can do what now</h2>
+
+<table>
+  <thead><tr><th>Role</th><th>Pages</th><th>Can manage</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Super Admin</strong></td>
+      <td class="ok">All 45</td>
+      <td>Everyone. The only role that can appoint or remove another super admin.</td>
+    </tr>
+    <tr>
+      <td><strong>Owner</strong></td>
+      <td class="ok">All 45</td>
+      <td>Everyone except a super admin. Can grant roles up to owner.</td>
+    </tr>
+    <tr>
+      <td><strong>Manager</strong></td>
+      <td>33</td>
+      <td>Salespeople only — passwords, logins, lead routing. <span class="no">No role changes at all.</span></td>
+    </tr>
+    <tr>
+      <td><strong>Salesperson</strong></td>
+      <td>10</td>
+      <td class="no">Nobody.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>The lock that has no key</h3>
+<p>
+  No role below super admin may grant super admin. That makes losing the last one
+  unrecoverable without direct database access, so the system refuses to demote,
+  suspend or delete the only super admin who can actually sign in. Promote a second
+  one first and the guard stands down.
+</p>
+
+<h2>The salesperson URL hole</h2>
+
+<p>
+  Access control was previously written page by page, and the shared route guard
+  only checked that <em>somebody</em> was signed in. A salesperson who typed
+  <code>/leads</code> or <code>/revenue</code> saw every lead in the business and all
+  revenue data. All 45 protected routes now declare who may open them, and a refusal
+  says so plainly instead of bouncing you around.
+</p>
+
+<h2>Also fixed, from the Supabase security advisor</h2>
+
+<table>
+  <tbody>
+    <tr><td>5 functions</td><td>Privileged internal functions were callable by anonymous visitors over the public API. Revoked.</td></tr>
+    <tr><td>4 tables</td><td>Invoice, quotation, purchase-order and supplier line items accepted new rows against <em>anybody's</em> document. Now scoped to documents you can see.</td></tr>
+    <tr><td>Dashboard stats</td><td>The summary view was readable without signing in. Revoked.</td></tr>
+    <tr><td>7 functions</td><td>Had a modifiable search path, a known privilege-escalation vector. Pinned.</td></tr>
+    <tr><td>Teams</td><td>A salesperson could create a team that then appeared in management reporting. Now staff only.</td></tr>
+    <tr><td>Account rows</td><td>Anyone could delete their own profile row, orphaning their leads. Now administrators only.</td></tr>
+  </tbody>
+</table>
+
+<h2>How this was verified</h2>
+
+<p>
+  Four throwaway accounts, one at each tier, tested against the live project and
+  deleted afterwards. The database was confirmed back to its exact prior state —
+  16 profiles, 9 logins, 131 leads.
+</p>
+
+<table>
+  <thead><tr><th>Test</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>29 authority cases across all four roles</td><td class="ok">29 / 29 passed</td></tr>
+    <tr><td>13 escalation attempts sent straight at the database, bypassing the app</td><td class="ok">all blocked</td></tr>
+    <tr><td>Last-super-admin protection</td><td class="ok">refused; stands down with a second</td></tr>
+    <tr><td>Anonymous access to privileged functions and views</td><td class="ok">all blocked</td></tr>
+    <tr><td>Route coverage — super admin a strict superset of every role</td><td class="ok">45 / 45 gated</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <p><strong>Two things left for you.</strong></p>
+  <p>
+    Turn on leaked-password protection in the Supabase dashboard
+    (Authentication → Policies) — it checks new passwords against known breach
+    lists and is the one advisor warning I cannot fix from here.
+  </p>
+  <p>
+    Separately: every signed-in person can still read the staff list — names,
+    emails and roles. That is ordinary directory information and the app relies on
+    it to show who a lead is assigned to, so I left it alone. Tell me if you would
+    rather it were restricted.
+  </p>
+</div>
+
+<footer>
+  Full detail in commit <code>1266215</code> on <code>techvitta-website/call-leads</code>.
+  Users &amp; Access lives at <code>/access</code>.
+</footer>
+
+</div>
+</body>
+</html>
