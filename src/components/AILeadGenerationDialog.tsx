@@ -35,7 +35,13 @@ import {
   Globe,
   TrendingUp,
 } from "lucide-react";
-import { generateLeadsWithAI, AIGeneratedLead } from "@/lib/gemini";
+import {
+  generateLeadsWithAI,
+  AIGeneratedLead,
+  SENIORITY_TIERS,
+  HEADCOUNT_BANDS,
+  DEPARTMENTS,
+} from "@/lib/gemini";
 import { createBulkLeads, supabase } from "@/lib/supabase";
 
 interface ProjectLike {
@@ -166,6 +172,12 @@ const toIndustrySlug = (...candidates: (string | undefined)[]): string => {
   return "other";
 };
 
+const CONFIDENCE_STYLES: Record<string, { cls: string; label: string; hint: string }> = {
+  high:   { cls: "bg-emerald-100 text-emerald-800 border-emerald-200", label: "Verified-ish", hint: "Model recognises this company" },
+  medium: { cls: "bg-amber-100 text-amber-800 border-amber-200",       label: "Check first",  hint: "Plausible, but confirm details before calling" },
+  low:    { cls: "bg-rose-100 text-rose-800 border-rose-200",          label: "Unverified",   hint: "Contact details are likely guessed \u2014 verify before use" },
+};
+
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: "bg-red-100 text-red-700 border-red-200",
   high: "bg-orange-100 text-orange-700 border-orange-200",
@@ -211,6 +223,17 @@ export default function AILeadGenerationDialog({
   const [keywords, setKeywords] = useState("");
   const [dealSizeHint, setDealSizeHint] = useState("");
   const [count, setCount] = useState("10");
+  const [headcountBands, setHeadcountBands] = useState<string[]>([]);
+  const [seniorities, setSeniorities] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [revenueMin, setRevenueMin] = useState("");
+  const [revenueMax, setRevenueMax] = useState("");
+  const [foundedAfter, setFoundedAfter] = useState("");
+  const [foundedBefore, setFoundedBefore] = useState("");
+  const [technologies, setTechnologies] = useState("");
+  const [keywordsInclude, setKeywordsInclude] = useState("");
+  const [keywordsExclude, setKeywordsExclude] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const clampedCount = Math.min(Math.max(parseInt(count) || 10, 1), 30);
   const [avoidDuplicates, setAvoidDuplicates] = useState(true);
   const [assignTo, setAssignTo] = useState<string>("unassigned");
@@ -293,6 +316,18 @@ export default function AILeadGenerationDialog({
         keywords: keywords.trim() || undefined,
         dealSizeHint: dealSizeHint.trim() || undefined,
         excludeCompanies: existingCompanies,
+        headcountBands: headcountBands.length ? headcountBands : undefined,
+        seniorities: seniorities.length ? seniorities : undefined,
+        departments: departments.length ? departments : undefined,
+        revenueMin: revenueMin.trim() || undefined,
+        revenueMax: revenueMax.trim() || undefined,
+        foundedAfter: foundedAfter.trim() || undefined,
+        foundedBefore: foundedBefore.trim() || undefined,
+        technologies: technologies.trim()
+          ? technologies.split(",").map((t) => t.trim()).filter(Boolean)
+          : undefined,
+        keywordsInclude: keywordsInclude.trim() || undefined,
+        keywordsExclude: keywordsExclude.trim() || undefined,
       });
 
       if (leads.length === 0) {
@@ -578,33 +613,227 @@ export default function AILeadGenerationDialog({
               </div>
             </div>
 
-            {/* Decision makers */}
+            {/* Who to reach — seniority, department, titles */}
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-semibold text-slate-800 mb-2 block">
+                  Seniority{" "}
+                  <span className="font-normal text-xs text-slate-500">
+                    ({seniorities.length === 0 ? "any level" : `${seniorities.length} selected`})
+                  </span>
+                </Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {SENIORITY_TIERS.map((tier) => {
+                    const active = seniorities.includes(tier.value);
+                    return (
+                      <button
+                        key={tier.value}
+                        type="button"
+                        onClick={() =>
+                          setSeniorities((prev) =>
+                            prev.includes(tier.value)
+                              ? prev.filter((v) => v !== tier.value)
+                              : [...prev, tier.value]
+                          )
+                        }
+                        className={`px-2.5 py-1 rounded-full text-xs border transition-all ${
+                          active
+                            ? "bg-violet-600 text-white border-violet-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-700"
+                        }`}
+                      >
+                        {tier.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold text-slate-800 mb-2 block">
+                  Department{" "}
+                  <span className="font-normal text-xs text-slate-500">
+                    ({departments.length === 0 ? "any" : `${departments.length} selected`})
+                  </span>
+                </Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DEPARTMENTS.map((dept) => {
+                    const active = departments.includes(dept);
+                    return (
+                      <button
+                        key={dept}
+                        type="button"
+                        onClick={() =>
+                          setDepartments((prev) =>
+                            prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept]
+                          )
+                        }
+                        className={`px-2.5 py-1 rounded-full text-xs border transition-all ${
+                          active
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-700"
+                        }`}
+                      >
+                        {dept}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold text-slate-800 mb-2 block">
+                  Specific job titles{" "}
+                  <span className="font-normal text-xs text-slate-500">
+                    ({roles.length === 0 ? "optional" : `${roles.length} selected`})
+                  </span>
+                </Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {ROLE_OPTIONS.map((role) => {
+                    const active = roles.includes(role);
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => toggleRole(role)}
+                        className={`px-2.5 py-1 rounded-full text-xs border transition-all ${
+                          active
+                            ? "bg-violet-600 text-white border-violet-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-700"
+                        }`}
+                      >
+                        {role}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Company headcount */}
             <div>
               <Label className="text-sm font-semibold text-slate-800 mb-2 block">
-                Decision makers to target{" "}
+                Company headcount{" "}
                 <span className="font-normal text-xs text-slate-500">
-                  ({roles.length === 0 ? "AI picks the best fit" : `${roles.length} selected`})
+                  ({headcountBands.length === 0 ? "any size" : `${headcountBands.length} bands`})
                 </span>
               </Label>
               <div className="flex flex-wrap gap-1.5">
-                {ROLE_OPTIONS.map((role) => {
-                  const active = roles.includes(role);
+                {HEADCOUNT_BANDS.map((band) => {
+                  const active = headcountBands.includes(band);
                   return (
                     <button
-                      key={role}
+                      key={band}
                       type="button"
-                      onClick={() => toggleRole(role)}
+                      onClick={() =>
+                        setHeadcountBands((prev) =>
+                          prev.includes(band) ? prev.filter((b) => b !== band) : [...prev, band]
+                        )
+                      }
                       className={`px-2.5 py-1 rounded-full text-xs border transition-all ${
                         active
-                          ? "bg-violet-600 text-white border-violet-600"
-                          : "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-700"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-700"
                       }`}
                     >
-                      {role}
+                      {band}
                     </button>
                   );
                 })}
               </div>
+            </div>
+
+            {/* Advanced: revenue, founded, tech, keyword include/exclude */}
+            <div className="rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <span>Advanced filters</span>
+                <span className="text-xs text-slate-400">{showAdvanced ? "Hide" : "Show"}</span>
+              </button>
+
+              {showAdvanced && (
+                <div className="space-y-4 border-t border-slate-200 p-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label className="mb-1.5 block text-xs font-medium text-slate-600">
+                        Annual revenue, minimum (₹)
+                      </Label>
+                      <Input
+                        value={revenueMin}
+                        onChange={(e) => setRevenueMin(e.target.value)}
+                        placeholder="1 crore"
+                      />
+                    </div>
+                    <div>
+                      <Label className="mb-1.5 block text-xs font-medium text-slate-600">
+                        Annual revenue, maximum (₹)
+                      </Label>
+                      <Input
+                        value={revenueMax}
+                        onChange={(e) => setRevenueMax(e.target.value)}
+                        placeholder="50 crore"
+                      />
+                    </div>
+                    <div>
+                      <Label className="mb-1.5 block text-xs font-medium text-slate-600">
+                        Founded after
+                      </Label>
+                      <Input
+                        value={foundedAfter}
+                        onChange={(e) => setFoundedAfter(e.target.value)}
+                        placeholder="2010"
+                      />
+                    </div>
+                    <div>
+                      <Label className="mb-1.5 block text-xs font-medium text-slate-600">
+                        Founded before
+                      </Label>
+                      <Input
+                        value={foundedBefore}
+                        onChange={(e) => setFoundedBefore(e.target.value)}
+                        placeholder="2023"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="mb-1.5 block text-xs font-medium text-slate-600">
+                      Already uses these tools (comma separated)
+                    </Label>
+                    <Input
+                      value={technologies}
+                      onChange={(e) => setTechnologies(e.target.value)}
+                      placeholder="Tally, Zoho, SAP, Shopify"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label className="mb-1.5 block text-xs font-medium text-emerald-700">
+                        Must mention
+                      </Label>
+                      <Input
+                        value={keywordsInclude}
+                        onChange={(e) => setKeywordsInclude(e.target.value)}
+                        placeholder="multi-branch, ISO certified"
+                      />
+                    </div>
+                    <div>
+                      <Label className="mb-1.5 block text-xs font-medium text-red-700">
+                        Exclude if it mentions
+                      </Label>
+                      <Input
+                        value={keywordsExclude}
+                        onChange={(e) => setKeywordsExclude(e.target.value)}
+                        placeholder="franchise, reseller, agency"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Count + dedupe */}
@@ -739,6 +968,14 @@ export default function AILeadGenerationDialog({
                         >
                           {lead.priority}
                         </Badge>
+                        {(() => {
+                          const c = CONFIDENCE_STYLES[lead.confidence ?? "medium"];
+                          return (
+                            <Badge className={`text-xs border ${c.cls}`} title={c.hint}>
+                              {c.label}
+                            </Badge>
+                          );
+                        })()}
                         {lead.company_size && (
                           <Badge variant="outline" className="text-xs text-slate-600">
                             {lead.company_size}

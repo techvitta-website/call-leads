@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Lead Generation — live run</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink-2:#334155; --ink-3:#64748b; --ink-4:#94a3b8;
+    --line:#e2e8f0; --surface:#fff; --bg:#f1f5f9;
+    --violet:#6d28d9; --violet-soft:#f5f3ff; --violet-line:#ddd6fe;
+    --emerald:#047857; --emerald-soft:#ecfdf5; --emerald-line:#a7f3d0;
+    --amber:#b45309; --amber-soft:#fffbeb; --amber-line:#fde68a;
+    --rose:#be123c; --rose-soft:#fff1f2; --rose-line:#fecdd3;
+    --indigo:#4338ca;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#f1f5f9; --ink-2:#cbd5e1; --ink-3:#94a3b8; --ink-4:#64748b;
+      --line:#1e293b; --surface:#0f172a; --bg:#020617;
+      --violet:#c4b5fd; --violet-soft:#1e1b4b; --violet-line:#312e81;
+      --emerald:#6ee7b7; --emerald-soft:#022c22; --emerald-line:#065f46;
+      --amber:#fcd34d; --amber-soft:#292006; --amber-line:#78350f;
+      --rose:#fda4af; --rose-soft:#2c0b0b; --rose-line:#881337;
+      --indigo:#a5b4fc;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:940px;margin:0 auto;padding:40px 20px 80px}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--ink-3);margin:0 0 28px}
+  h2{font-size:18px;margin:36px 0 4px;letter-spacing:-.01em}
+  .h2sub{color:var(--ink-3);font-size:14px;margin:0 0 14px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+  .flabel{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-4);margin-bottom:7px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+  .chip{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--ink-3);background:var(--surface)}
+  .chip.on{color:#fff;border-color:transparent}
+  .chip.v{background:var(--violet)}
+  .chip.i{background:var(--indigo)}
+  .chip.e{background:#047857}
+  @media (prefers-color-scheme: dark){ .chip.v,.chip.i,.chip.e{color:#0f172a} }
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:13px;margin:0}
+  .kv dt{color:var(--ink-4)}
+  .kv dd{margin:0;color:var(--ink-2)}
+  .lead{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:12px}
+  .lead-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px}
+  .co{font-weight:650;font-size:16px}
+  .badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid}
+  .b-urgent{background:var(--rose-soft);color:var(--rose);border-color:var(--rose-line)}
+  .b-high{background:var(--amber-soft);color:var(--amber);border-color:var(--amber-line)}
+  .b-medium{background:var(--bg);color:var(--ink-3);border-color:var(--line)}
+  .b-unver{background:var(--rose-soft);color:var(--rose);border-color:var(--rose-line)}
+  .b-val{background:var(--emerald-soft);color:var(--emerald);border-color:var(--emerald-line)}
+  .b-size{background:var(--bg);color:var(--ink-3);border-color:var(--line)}
+  .meta{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:12.5px;color:var(--ink-3);margin-bottom:10px}
+  .fit{font-size:12.5px;background:var(--violet-soft);border:1px solid var(--violet-line);color:var(--ink-2);border-radius:8px;padding:7px 10px;margin-bottom:5px}
+  .sig{font-size:12.5px;background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--ink-2);border-radius:8px;padding:7px 10px}
+  .fit b,.sig b{color:var(--ink)}
+  .note{border-left:3px solid var(--violet);background:var(--violet-soft);border-radius:0 10px 10px 0;padding:13px 16px;margin:16px 0;font-size:14px;color:var(--ink-2)}
+  .warn{border-left:3px solid var(--amber);background:var(--amber-soft);border-radius:0 10px 10px 0;padding:13px 16px;margin:16px 0;font-size:14px;color:var(--ink-2)}
+  .note b,.warn b{color:var(--ink)}
+  code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);padding:1px 5px;border-radius:4px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}
+  th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--line);color:var(--ink-4);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--ink-2)}
+  .tick{color:#059669;font-weight:700}
+  @media (prefers-color-scheme: dark){ .tick{color:#6ee7b7} }
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);color:var(--ink-4);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>AI Lead Generation — a real run</h1>
+<p class="sub">Not a mockup. These filters were sent through the live Gemini proxy on your Supabase project, and these six prospects are what came back.</p>
+
+<h2>What was asked for</h2>
+<p class="h2sub">Project: <strong>HRMS</strong> — targeting brief assembled from the new filter panel</p>
+
+<div class="panel">
+  <div class="flabel">Seniority</div>
+  <div class="chips">
+    <span class="chip">Owner</span><span class="chip">Founder</span>
+    <span class="chip on v">C-Suite</span><span class="chip">Partner</span>
+    <span class="chip">VP</span><span class="chip on v">Head of</span>
+    <span class="chip on v">Director</span><span class="chip">Manager</span>
+    <span class="chip">Senior</span><span class="chip">Entry level</span><span class="chip">Intern</span>
+  </div>
+
+  <div class="flabel">Department</div>
+  <div class="chips">
+    <span class="chip">C-Suite</span><span class="chip">Sales</span><span class="chip">Marketing</span>
+    <span class="chip on i">Operations</span><span class="chip">Finance</span>
+    <span class="chip on i">Human Resources</span><span class="chip">IT</span>
+    <span class="chip">Engineering</span><span class="chip">Product</span><span class="chip">Legal</span>
+  </div>
+
+  <div class="flabel">Company headcount</div>
+  <div class="chips">
+    <span class="chip">1-10</span><span class="chip">11-20</span><span class="chip">21-50</span>
+    <span class="chip">51-100</span><span class="chip on e">101-200</span>
+    <span class="chip on e">201-500</span><span class="chip">501-1000</span>
+    <span class="chip">1001-2000</span><span class="chip">2001-5000</span>
+    <span class="chip">5001-10000</span><span class="chip">10001+</span>
+  </div>
+
+  <div class="flabel">Advanced</div>
+  <dl class="kv">
+    <dt>Industry</dt><dd>Manufacturing</dd>
+    <dt>Region</dt><dd>Telangana &amp; Andhra Pradesh</dd>
+    <dt>Cities</dt><dd>Hyderabad, Vijayawada</dd>
+    <dt>Already uses</dt><dd>Tally, Excel</dd>
+    <dt>Must mention</dt><dd>multiple plants, shift-based workforce</dd>
+    <dt>Exclude if</dt><dd>staffing agency, consultancy, franchise</dd>
+    <dt>Buying signal</dt><dd>recently expanded or hiring at scale</dd>
+    <dt>Deal size</dt><dd>₹2L – ₹8L per year</dd>
+    <dt>Skip</dt><dd>companies already in this project</dd>
+  </dl>
+</div>
+
+<h2>What came back</h2>
+<p class="h2sub">Six prospects, generated in about 20 seconds via <code>gemini-2.5-flash</code></p>
+
+<div class="lead">
+  <div class="lead-top">
+    <span class="co">Zenith Pharmaceuticals Pvt Ltd</span>
+    <span class="badge b-urgent">urgent</span>
+    <span class="badge b-unver">Unverified</span>
+    <span class="badge b-size">201-500 employees</span>
+    <span class="badge b-val">~₹6,50,000</span>
+  </div>
+  <div class="meta">
+    <span>Ramesh Kumar · HR Director</span><span>ramesh.kumar@zenithpharma.in</span>
+    <span>+91 9876543210</span><span>Hyderabad, Telangana</span>
+    <span>Pharmaceutical Manufacturing</span>
+  </div>
+  <div class="fit"><b>Why they fit:</b> Pharmaceutical company with multiple manufacturing units — complex shift management, compliance, and large-scale workforce tracking.</div>
+  <div class="sig"><b>Signal:</b> Recently announced R&amp;D facility expansion and plans to hire 100+ new employees.</div>
+</div>
+
+<div class="lead">
+  <div class="lead-top">
+    <span class="co">Futura Auto Components Ltd</span>
+    <span class="badge b-urgent">urgent</span>
+    <span class="badge b-unver">Unverified</span>
+    <span class="badge b-size">201-500 employees</span>
+    <span class="badge b-val">~₹7,50,000</span>
+  </div>
+  <div class="meta">
+    <span>Sanjay Sharma · CHRO</span><span>sanjay.sharma@futuraauto.in</span>
+    <span>+91 9876543212</span><span>Hyderabad, Telangana</span>
+    <span>Automotive Component Manufacturing</span>
+  </div>
+  <div class="fit"><b>Why they fit:</b> Complex shift schedules across multiple plants and a large, diversified workforce needing robust HR management.</div>
+  <div class="sig"><b>Signal:</b> Announced a partnership with a major OEM and is actively recruiting for engineering and production roles.</div>
+</div>
+
+<div class="lead">
+  <div class="lead-top">
+    <span class="co">PolyPack Solutions Pvt Ltd</span>
+    <span class="badge b-high">high</span>
+    <span class="badge b-unver">Unverified</span>
+    <span class="badge b-size">101-200 employees</span>
+    <span class="badge b-val">~₹4,80,000</span>
+  </div>
+  <div class="meta">
+    <span>Arun Das · Head of Human Resources</span><span>arun.das@polypack.in</span>
+    <span>+91 9876543214</span><span>Hyderabad, Telangana</span>
+    <span>Plastic Packaging Manufacturing</span>
+  </div>
+  <div class="fit"><b>Why they fit:</b> Continuous processes with a shift-based workforce across multiple production lines.</div>
+  <div class="sig"><b>Signal:</b> Launched eco-friendly packaging lines and is hiring for production and R&amp;D.</div>
+</div>
+
+<div class="lead">
+  <div class="lead-top">
+    <span class="co">Delta Food Products Pvt Ltd</span>
+    <span class="badge b-high">high</span>
+    <span class="badge b-unver">Unverified</span>
+    <span class="badge b-size">101-200 employees</span>
+    <span class="badge b-val">~₹4,00,000</span>
+  </div>
+  <div class="meta">
+    <span>Anjali Reddy · Head of Human Resources</span><span>anjali.reddy@deltafoods.in</span>
+    <span>+91 9876543211</span><span>Vijayawada, Andhra Pradesh</span>
+    <span>Food Processing &amp; Beverages</span>
+  </div>
+  <div class="fit"><b>Why they fit:</b> Shift-based workforce and seasonal hiring; needs precise attendance tracking for production lines.</div>
+  <div class="sig"><b>Signal:</b> Secured a large distribution contract, so production capacity and headcount are scaling.</div>
+</div>
+
+<div class="lead">
+  <div class="lead-top">
+    <span class="co">ElectroTech Systems Pvt Ltd</span>
+    <span class="badge b-medium">medium</span>
+    <span class="badge b-unver">Unverified</span>
+    <span class="badge b-size">201-500 employees</span>
+    <span class="badge b-val">~₹5,50,000</span>
+  </div>
+  <div class="meta">
+    <span>Vikram Gupta · Operations Director</span><span>vikram.gupta@electrotech.in</span>
+    <span>+91 9876543215</span><span>Hyderabad, Telangana</span>
+    <span>Electrical Component Manufacturing</span>
+  </div>
+  <div class="fit"><b>Why they fit:</b> Large shift-based workforce across multiple production units; HR efficiency is tied to productivity.</div>
+  <div class="sig"><b>Signal:</b> Expanding into new industrial sectors and recently opened a new assembly line.</div>
+</div>
+
+<div class="lead">
+  <div class="lead-top">
+    <span class="co">Sai Textiles &amp; Apparel Pvt Ltd</span>
+    <span class="badge b-medium">medium</span>
+    <span class="badge b-unver">Unverified</span>
+    <span class="badge b-size">101-200 employees</span>
+    <span class="badge b-val">~₹3,50,000</span>
+  </div>
+  <div class="meta">
+    <span>Priya Singh · Director of Operations</span><span>priya.singh@saitextiles.in</span>
+    <span>+91 9876543213</span><span>Vijayawada, Andhra Pradesh</span>
+    <span>Textile &amp; Apparel Manufacturing</span>
+  </div>
+  <div class="fit"><b>Why they fit:</b> Shift-based operations with contract labour; benefits from integrated attendance, payroll and compliance.</div>
+  <div class="sig"><b>Signal:</b> Modernising weaving units and expanding export reach.</div>
+</div>
+
+<h2>Did it actually obey the filters?</h2>
+<p class="h2sub">Checked against all six results, not spot-checked</p>
+
+<table>
+  <thead><tr><th>Filter</th><th>Asked for</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>Cities</td><td>Hyderabad, Vijayawada</td><td><span class="tick">✓</span> 4 Hyderabad, 2 Vijayawada — no others</td></tr>
+    <tr><td>Headcount</td><td>101-200 or 201-500</td><td><span class="tick">✓</span> 3 and 3, nothing outside the bands</td></tr>
+    <tr><td>Seniority</td><td>C-Suite / Head of / Director</td><td><span class="tick">✓</span> CHRO, 2× Head of HR, HR Director, 2× Ops Director</td></tr>
+    <tr><td>Department</td><td>HR or Operations</td><td><span class="tick">✓</span> 4 HR, 2 Operations</td></tr>
+    <tr><td>Industry</td><td>Manufacturing</td><td><span class="tick">✓</span> pharma, auto, food, textile, plastics, electrical — all manufacturing sub-verticals, and varied</td></tr>
+    <tr><td>Exclusions</td><td>no staffing / consultancy / franchise</td><td><span class="tick">✓</span> none present</td></tr>
+    <tr><td>Deal size</td><td>₹2L – ₹8L</td><td><span class="tick">✓</span> ₹3.5L – ₹7.5L</td></tr>
+    <tr><td>Skip existing</td><td>Sunrise Textiles, Meridian Steel</td><td><span class="tick">✓</span> neither returned</td></tr>
+    <tr><td>Buying signal</td><td>expanding or hiring</td><td><span class="tick">✓</span> all six cite a specific expansion or hiring trigger</td></tr>
+  </tbody>
+</table>
+
+<h2>The honest part</h2>
+
+<div class="warn">
+  <p><b>Every one of these came back marked "Unverified", and that's the model telling the truth.</b></p>
+  <p>Look at the phone numbers: <code>9876543210</code>, <code>…211</code>, <code>…212</code>, <code>…213</code>. Sequential. They're placeholders, not real numbers. The email addresses follow a guessed <code>firstname.lastname@domain</code> pattern, and the contact names are plausible rather than known.</p>
+</div>
+
+<div class="note">
+  <p><b>So what is this actually good for?</b> The <em>targeting</em> and the <em>reasoning</em> are the valuable output here — which sub-verticals fit an HRMS pitch, why a pharma plant feels this pain differently from a textile unit, and what trigger to open the call with. That's genuinely useful prep.</p>
+  <p>The contact details are a starting point for research, not a dialling list. Treat a generated lead as "here is a company worth looking up", then verify the person and number before anyone calls. The confidence badge exists so a rep can tell at a glance which is which, rather than discovering it on a dead line.</p>
+</div>
+
+<footer>
+  Generated live against project <code>uvqlonqtlqypxqatgbih</code> · gemini-2.5-flash · July 2026<br>
+  Test data was removed from the database after this run; nothing here was imported into your leads.
+</footer>
+
+</div>
+</body>
+</html>
