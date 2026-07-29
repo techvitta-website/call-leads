@@ -9,8 +9,9 @@ import RevenueChart from "@/components/dashboard/RevenueChart";
 import { Card } from "@/components/ui/card";
 import { getLeads, getUsers, getCurrentUser, getUserRole } from "@/lib/supabase";
 import { formatCurrency, formatCurrencyCompact } from "@/utils/currency";
+import { isAdmin, normalizeRole, homeFor } from "@/lib/roles";
 
-type UserRole = "owner" | "manager" | "salesman";
+
 
 const OwnerDashboard = () => {
   const [stats, setStats] = useState([
@@ -68,9 +69,10 @@ const OwnerDashboard = () => {
         // Use centralized role check - always gets fresh data from DB
         const userRole = await getUserRole(currentUser.id);
         
-        if (!userRole || userRole !== 'owner') {
-          const roleRoutes: Record<string, string> = { manager: '/manager', salesman: '/salesman' };
-          navigate(roleRoutes[userRole as UserRole] || '/', { replace: true });
+        // A super admin outranks an owner, so they belong here too. Comparing
+        // against 'owner' exactly would send them away from their own dashboard.
+        if (!isAdmin(normalizeRole(userRole))) {
+          navigate(homeFor(normalizeRole(userRole)), { replace: true });
           return;
         }
 

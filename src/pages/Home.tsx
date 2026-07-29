@@ -7,8 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase, signInWithEmail, signUpWithEmail } from "@/lib/supabase";
 import { formatCurrencyCompact } from "@/utils/currency";
+import type { Role as UserRole } from "@/lib/roles";
 
-type UserRole = "owner" | "manager" | "salesman";
 
 const Home = () => {
   const navigate = useNavigate();

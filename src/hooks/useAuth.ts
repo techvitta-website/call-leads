@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, createUserSession, updateUserSessionLogout } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import type { Role as UserRole } from '@/lib/roles';
 
-type UserRole = 'owner' | 'manager' | 'salesman';
 
 const normalizeRole = (value: unknown): UserRole | null => {
   const role = String(value ?? '').toLowerCase().trim();
@@ -181,7 +181,7 @@ export const useAuth = () => {
     }
   };
 
-  const signup = async (email: string, password: string, fullName: string, role: 'owner' | 'manager' | 'salesman') => {
+  const signup = async (email: string, password: string, fullName: string, role: UserRole) => {
     try {
       setError(null);
       const { data, error } = await supabase.auth.signUp({

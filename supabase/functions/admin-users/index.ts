@@ -7,13 +7,16 @@
 // request rather than trusted from the token.
 //
 // Who can do what:
-//   owner    everything, on anyone
-//   manager  create / reset / suspend SALESPEOPLE only
-//   salesman nothing
+//   super_admin  everything, on anyone
+//   owner        everything except touching a super admin
+//   manager      create / reset / suspend SALESPEOPLE only
+//   salesman     nothing
 //
-// Two invariants are enforced regardless of role:
+// Three invariants are enforced regardless of role:
 //   - nobody can grant a role higher than their own (no escalation)
-//   - the last remaining owner cannot be demoted, suspended or deleted
+//   - nobody can administer someone who outranks them
+//   - the last administrator who can actually sign in cannot be demoted,
+//     suspended or deleted
 // ═══════════════════════════════════════════════════════════════
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -36,11 +39,23 @@ const admin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
-const ROLES = ["owner", "manager", "salesman"] as const;
+const ROLES = ["super_admin", "owner", "manager", "salesman"] as const;
 type Role = (typeof ROLES)[number];
 
 /** Higher number = more authority. */
-const RANK: Record<Role, number> = { salesman: 1, manager: 2, owner: 3 };
+const RANK: Record<Role, number> = { salesman: 1, manager: 2, owner: 3, super_admin: 4 };
+
+/** "super_admin" is a database value, not something to show a person. */
+const LABEL: Record<Role, string> = {
+  super_admin: "super admin",
+  owner: "owner",
+  manager: "manager",
+  salesman: "salesperson",
+};
+const label = (r: string) => LABEL[r as Role] ?? r;
+
+/** Roles that administer the whole account rather than a slice of it. */
+const isAdminRole = (r: Role) => r === "super_admin" || r === "owner";
 
 /** Supabase's "banned forever" is a very long duration, not a flag. */
 const FOREVER = "876000h";
@@ -76,8 +91,8 @@ Deno.serve(async (req) => {
   if (!me) return json({ error: "Your account has no profile record." }, 403);
 
   const myRole = String(me.role) as Role;
-  if (myRole !== "owner" && myRole !== "manager") {
-    return json({ error: "Only owners and managers can manage users." }, 403);
+  if (!isAdminRole(myRole) && myRole !== "manager") {
+    return json({ error: "Only administrators and managers can manage users." }, 403);
   }
 
   let body: any;
@@ -101,25 +116,43 @@ Deno.serve(async (req) => {
   };
 
   /**
-   * Owners who can actually sign in right now.
+   * How many people holding one of these roles can actually sign in.
    *
    * Counting profile rows alone is wrong: a row in `users` with no matching
    * auth account cannot log in, and neither can a suspended one. Seed and
    * demo data leaves exactly those rows behind, so a naive count reports two
-   * owners where there is really one — and then happily lets you demote the
-   * only real one.
+   * administrators where there is really one — and then happily lets you
+   * demote the only real one.
    */
-  const ownerCount = async () => {
-    const { data: ownerRows } = await admin
+  const signableCount = async (roles: Role[]) => {
+    const { data: rows } = await admin
       .from("users")
       .select("id")
-      .eq("role", "owner");
+      .in("role", roles);
 
-    const ownerIds = new Set((ownerRows ?? []).map((r: any) => r.id));
-    if (ownerIds.size === 0) return 0;
+    const ids = new Set((rows ?? []).map((r: any) => r.id));
+    if (ids.size === 0) return 0;
 
     const auth = await listAuthUsers();
-    return auth.filter((u: any) => ownerIds.has(u.id) && !isSuspended(u)).length;
+    return auth.filter((u: any) => ids.has(u.id) && !isSuspended(u)).length;
+  };
+
+  /**
+   * Would this change leave the account unadministrable?
+   *
+   * Two separate cliffs, and the super-admin one is the sharper of the two:
+   * no lower role can grant super_admin (the rank check forbids granting
+   * above your own tier), so losing the last one makes the tier permanently
+   * unreachable — there is no way back short of editing the database by hand.
+   */
+  const strandingReason = async (targetRole: Role): Promise<string | null> => {
+    if (targetRole === "super_admin" && (await signableCount(["super_admin"])) <= 1) {
+      return "This is the only super admin who can sign in. No other role is allowed to grant super admin, so there would be no way to restore it. Promote someone else first.";
+    }
+    if (isAdminRole(targetRole) && (await signableCount(["super_admin", "owner"])) <= 1) {
+      return "This is the only administrator who can sign in. Promote someone else to owner first.";
+    }
+    return null;
   };
 
   const loadTarget = async (id: string) => {
@@ -133,7 +166,9 @@ Deno.serve(async (req) => {
 
   /** Can the caller act on this target at all? */
   const mayAdminister = (targetRole: Role) => {
-    if (myRole === "owner") return true;
+    if (myRole === "super_admin") return true;
+    // An owner runs everything except a super admin, who outranks them.
+    if (myRole === "owner") return targetRole !== "super_admin";
     // A manager may only touch salespeople — never a peer or a superior.
     return targetRole === "salesman";
   };
@@ -203,12 +238,12 @@ Deno.serve(async (req) => {
       if (!ROLES.includes(role)) return json({ error: "Unknown role." }, 400);
 
       if (RANK[role] > RANK[myRole]) {
-        return json({ error: `As a ${myRole} you cannot create a ${role}.` }, 403);
+        return json({ error: `As a ${label(myRole)} you cannot create a ${label(role)}.` }, 403);
       }
       // Managers may only ever create salespeople — creating a peer would be
       // the same lateral escalation that set_role blocks.
-      if (myRole !== "owner" && role !== "salesman") {
-        return json({ error: "Only an owner can create managers or owners." }, 403);
+      if (!isAdminRole(myRole) && role !== "salesman") {
+        return json({ error: "Only an administrator can create managers or owners." }, 403);
       }
 
       // createUser with email_confirm skips the verification email — these
@@ -256,8 +291,8 @@ Deno.serve(async (req) => {
     // administered through the normal path — the lookup below would 404 —
     // but it can still authenticate, which is exactly why it needs removing.
     if (action === "delete_orphan_login") {
-      if (myRole !== "owner") {
-        return json({ error: "Only an owner can remove a stray login." }, 403);
+      if (!isAdminRole(myRole)) {
+        return json({ error: "Only an administrator can remove a stray login." }, 403);
       }
 
       const id = String(body?.userId ?? "");
@@ -291,7 +326,12 @@ Deno.serve(async (req) => {
     const targetRole = String(target.role) as Role;
     if (!mayAdminister(targetRole)) {
       return json(
-        { error: `As a ${myRole} you can only manage salespeople. ${target.email} is a ${targetRole}.` },
+        {
+          error:
+            myRole === "owner"
+              ? `${target.email} is a ${label(targetRole)}, who outranks you. Only another super admin can manage them.`
+              : `As a ${label(myRole)} you can only manage salespeople. ${target.email} is a ${label(targetRole)}.`,
+        },
         403,
       );
     }
@@ -316,30 +356,31 @@ Deno.serve(async (req) => {
       const newRole = String(body?.role ?? "") as Role;
       if (!ROLES.includes(newRole)) return json({ error: "Unknown role." }, 400);
 
-      // Role assignment is owner-only. Allowing a manager to grant "manager"
-      // is lateral escalation — it lets one manager mint peers without the
-      // owner's involvement, which defeats the point of having an owner tier.
-      if (myRole !== "owner") {
+      // Role assignment is administrator-only. Allowing a manager to grant
+      // "manager" is lateral escalation — it lets one manager mint peers
+      // without an administrator's involvement, which defeats the point of
+      // having tiers at all.
+      if (!isAdminRole(myRole)) {
         return json(
-          { error: "Only an owner can change someone's role. Ask the account owner." },
+          { error: "Only an administrator can change someone's role. Ask the account owner." },
           403,
         );
       }
 
-      // Belt and braces even for owners: never grant above your own rank.
+      // Never grant above your own rank. This is what stops an owner from
+      // making themselves — or anyone else — a super admin.
       if (RANK[newRole] > RANK[myRole]) {
         return json(
-          { error: `As a ${myRole} you cannot grant the ${newRole} role.` },
+          { error: `As a ${label(myRole)} you cannot grant the ${label(newRole)} role.` },
           403,
         );
       }
 
-      // Don't strand the system with no owner.
-      if (targetRole === "owner" && newRole !== "owner" && (await ownerCount()) <= 1) {
-        return json(
-          { error: "This is the only owner who can sign in. Promote someone else to owner first." },
-          409,
-        );
+      // Don't strand the account. Only relevant when the change actually
+      // removes authority — promoting an owner to super admin is fine.
+      if (RANK[newRole] < RANK[targetRole]) {
+        const reason = await strandingReason(targetRole);
+        if (reason) return json({ error: reason }, 409);
       }
 
       const { error } = await admin
@@ -389,8 +430,9 @@ Deno.serve(async (req) => {
       if (!active && targetId === me.id) {
         return json({ error: "You cannot suspend your own login." }, 409);
       }
-      if (!active && targetRole === "owner" && (await ownerCount()) <= 1) {
-        return json({ error: "This is the only owner who can sign in — suspending it would lock everyone out." }, 409);
+      if (!active) {
+        const reason = await strandingReason(targetRole);
+        if (reason) return json({ error: reason }, 409);
       }
 
       const { error } = await admin.auth.admin.updateUserById(targetId, {
@@ -411,9 +453,8 @@ Deno.serve(async (req) => {
       if (targetId === me.id) {
         return json({ error: "You cannot delete your own account." }, 409);
       }
-      if (targetRole === "owner" && (await ownerCount()) <= 1) {
-        return json({ error: "This is the only owner who can sign in." }, 409);
-      }
+      const reason = await strandingReason(targetRole);
+      if (reason) return json({ error: reason }, 409);
 
       // Leads point at users; orphaning them silently would lose ownership
       // history, so hand them back to the person doing the deleting.

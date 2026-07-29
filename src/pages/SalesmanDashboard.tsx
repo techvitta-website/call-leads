@@ -7,8 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentUser, getUserById, getUserRole, getLeads, subscribeToLeads } from "@/lib/supabase";
 import { formatCurrencyCompact } from "@/utils/currency";
+import type { Role as UserRole } from "@/lib/roles";
 
-type UserRole = "owner" | "manager" | "salesman";
 
 const SalesmanDashboard = () => {
   const [loading, setLoading] = useState(true);

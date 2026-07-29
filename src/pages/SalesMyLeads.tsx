@@ -16,7 +16,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-type UserRole = "owner" | "manager" | "salesman";
 import { formatDistanceToNow } from "date-fns";
 import {
   DropdownMenu,
@@ -25,6 +24,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import type { Role as UserRole } from "@/lib/roles";
 
 const stageColors: Record<string, string> = {
   new: "bg-blue-50 text-blue-700 border-blue-200",

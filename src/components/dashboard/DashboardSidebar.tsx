@@ -20,6 +20,16 @@ import {
   Send,
   ListChecks,
   ShieldCheck,
+  CalendarClock,
+  Layers,
+  Trophy,
+  XCircle,
+  Building2,
+  FileText,
+  Receipt,
+  BadgeIndianRupee,
+  Package,
+  ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,77 +42,132 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { normalizeRole, ROLE_LABEL, ADMIN_ONLY, STAFF, EVERYONE, SALES_SCOPE, type Role } from "@/lib/roles";
 
 interface SidebarProps {
-  role: "owner" | "manager" | "salesman";
+  role?: Role | string;
 }
 
-const getMenuItems = (role: "owner" | "manager" | "salesman") => {
-  const baseItems = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/" + role },
-  ];
+/**
+ * The whole application, grouped.
+ *
+ * A super admin sees every section. Previously the owner navigation listed
+ * seven items against the manager's ten, so the highest role in the system
+ * had the narrowest menu and no way to reach projects, automations,
+ * sequences, invoicing or purchasing at all.
+ */
+const SECTIONS: {
+  heading: string;
+  allow: Role[];
+  items: { icon: any; label: string; path: string; allow?: Role[] }[];
+}[] = [
+  {
+    heading: "Overview",
+    allow: EVERYONE,
+    items: [
+      { icon: LayoutDashboard, label: "Executive Dashboard", path: "/owner", allow: ADMIN_ONLY },
+      { icon: LayoutDashboard, label: "Dashboard", path: "/manager", allow: ["manager"] },
+      { icon: LayoutDashboard, label: "Dashboard", path: "/salesman", allow: ["salesman"] },
+      { icon: LineChart, label: "Analytics", path: "/analytics", allow: STAFF },
+      { icon: PieChart, label: "Revenue Reports", path: "/revenue", allow: ADMIN_ONLY },
+      { icon: Briefcase, label: "Regions", path: "/regions", allow: STAFF },
+    ],
+  },
+  {
+    heading: "Leads",
+    allow: STAFF,
+    items: [
+      { icon: Target, label: "Leads", path: "/manager/leads" },
+      { icon: BarChart3, label: "All Leads", path: "/leads", allow: STAFF },
+      { icon: Target, label: "Leads Overview", path: "/manager/pipeline" },
+      { icon: Briefcase, label: "Projects", path: "/manager/projects" },
+      { icon: ListChecks, label: "Lists & Searches", path: "/manager/lead-lists" },
+      { icon: CalendarClock, label: "Follow-ups", path: "/manager/follow-ups" },
+    ],
+  },
+  {
+    heading: "Outreach",
+    allow: STAFF,
+    items: [
+      { icon: Send, label: "Sequences", path: "/manager/sequences" },
+      { icon: Zap, label: "Automations", path: "/manager/automations" },
+    ],
+  },
+  {
+    heading: "Deals",
+    allow: STAFF,
+    items: [
+      { icon: Layers, label: "Deal Stages", path: "/manager/deal-stages" },
+      { icon: Trophy, label: "Won Deals", path: "/manager/won-deals" },
+      { icon: XCircle, label: "Lost Deals", path: "/manager/lost-deals" },
+      { icon: Building2, label: "Clients", path: "/manager/clients" },
+    ],
+  },
+  {
+    heading: "Sales & Purchasing",
+    allow: STAFF,
+    items: [
+      { icon: FileText, label: "Quotations", path: "/manager/quotations" },
+      { icon: Receipt, label: "Invoices", path: "/manager/invoices" },
+      { icon: BadgeIndianRupee, label: "Receipts", path: "/manager/receipts" },
+      { icon: Package, label: "Suppliers", path: "/manager/suppliers" },
+      { icon: ShoppingCart, label: "Purchase Orders", path: "/manager/purchase-orders" },
+    ],
+  },
+  {
+    heading: "My Work",
+    allow: SALES_SCOPE,
+    items: [
+      { icon: Phone, label: "My Leads", path: "/sales/my-leads" },
+      { icon: Target, label: "My Pipeline", path: "/sales/pipeline" },
+      { icon: CalendarClock, label: "My Follow-ups", path: "/sales/follow-ups" },
+      { icon: Award, label: "Leaderboard", path: "/sales/leaderboard" },
+    ],
+  },
+  {
+    heading: "People",
+    allow: STAFF,
+    items: [
+      { icon: Users, label: "Teams", path: "/teams", allow: STAFF },
+      { icon: TrendingUp, label: "Sales Performance", path: "/manager/sales-performance" },
+      { icon: Award, label: "Activity Log", path: "/manager/activity" },
+      { icon: ShieldCheck, label: "Users & Access", path: "/manager/access" },
+    ],
+  },
+];
 
-  const ownerItems = [
-    ...baseItems,
-    { icon: BarChart3, label: "All Leads", path: "/leads" },
-    { icon: Users, label: "Teams", path: "/teams" },
-    { icon: LineChart, label: "Analytics", path: "/analytics" },
-    { icon: Briefcase, label: "Regions", path: "/regions" },
-    { icon: PieChart, label: "Revenue Reports", path: "/revenue" },
-    { icon: ShieldCheck, label: "Users & Access", path: "/access" },
-  ];
-
-  const managerItems = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/manager" },
-    { icon: Briefcase, label: "Projects", path: "/manager/projects" },
-    { icon: Target, label: "Leads Overview", path: "/manager/pipeline" },
-    { icon: Target, label: "Leads", path: "/manager/leads" },
-    { icon: TrendingUp, label: "Sales Performance", path: "/manager/sales-performance" },
-    { icon: ListChecks, label: "Lists & Searches", path: "/manager/lead-lists" },
-    { icon: Send, label: "Sequences", path: "/manager/sequences" },
-    { icon: Zap, label: "Automations", path: "/manager/automations" },
-    // This page is an activity log, not a user manager — it was mislabelled.
-    { icon: Award, label: "Activity Log", path: "/manager/activity" },
-    { icon: ShieldCheck, label: "Users & Access", path: "/manager/access" },
-  ];
-
-  const salesmanItems = [
-    ...baseItems,
-    { icon: Phone, label: "My Leads", path: "/sales/my-leads" },
-    { icon: Target, label: "Leads Overview", path: "/sales/pipeline" },
-  ];
-
-  if (role === "owner") return ownerItems;
-  if (role === "manager") return managerItems;
-  return salesmanItems;
-};
+const getSections = (role: Role) =>
+  SECTIONS.filter((sec) => sec.allow.includes(role))
+    .map((sec) => ({
+      ...sec,
+      items: sec.items.filter((it) => !it.allow || it.allow.includes(role)),
+    }))
+    .filter((sec) => sec.items.length > 0);
 
 const DashboardSidebar = ({ role }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string>("");
+  const [actualRole, setActualRole] = useState<Role | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const normalizedRole = String(role || 'salesman').toLowerCase() as "owner" | "manager" | "salesman";
-  const menuItems = getMenuItems(normalizedRole);
+
+  // Every page passes this prop as a hardcoded literal — most manager pages
+  // say role="manager" regardless of who is looking. Treat the prop as a
+  // first-paint hint only and trust the database, or an administrator gets
+  // the manager's narrow menu on two thirds of the app.
+  // Fail closed: an unrecognised role gets the narrowest menu, not the widest.
+  const normalizedRole: Role = actualRole ?? normalizeRole(role) ?? "salesman";
+  const sections = getSections(normalizedRole);
 
   // Always use normalizedRole for labels/colors
-  const roleLabels = {
-    owner: "Owner",
-    manager: "Manager",
-    salesman: "Salesman",
-  };
+  const roleLabels = ROLE_LABEL;
 
-  const roleColors = {
+  const roleColors: Record<Role, string> = {
+    super_admin: "bg-emerald-700",
     owner: "bg-blue-600",
     manager: "bg-slate-900",
     salesman: "bg-orange-600",
-  };
-
-  const roleAccentColors = {
-    owner: "bg-blue-50 text-blue-700",
-    manager: "bg-slate-100 text-slate-900",
-    salesman: "bg-orange-50 text-orange-700",
   };
 
   const handleLogout = async () => {
@@ -113,12 +178,31 @@ const DashboardSidebar = ({ role }: SidebarProps) => {
   };
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchUser = async () => {
       const { data } = await supabase.auth.getUser();
-      const email = data?.user?.email || "User";
-      setUserEmail(email);
+      const user = data?.user;
+      if (cancelled) return;
+      setUserEmail(user?.email || "User");
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+      setActualRole(
+        normalizeRole(profile?.role) ?? normalizeRole(user.user_metadata?.role),
+      );
     };
+
     fetchUser();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const SidebarContent = () => (
@@ -146,33 +230,44 @@ const DashboardSidebar = ({ role }: SidebarProps) => {
         </Button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4">
-        <ul className="space-y-1">
-          {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <li key={item.path}>
-                <button
-                  onClick={() => {
-                    navigate(item.path);
-                    setIsMobileOpen(false);
-                  }}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 font-medium text-sm",
-                    isActive
-                      ? `${roleColors[normalizedRole]} text-white shadow-sm`
-                      : "text-slate-700 hover:text-slate-900 hover:bg-slate-100",
-                    isCollapsed && "justify-center"
-                  )}
-                >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  {!isCollapsed && <span>{item.label}</span>}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+      {/* Navigation. Grouped under headings because a super admin sees every
+          section at once and a flat list of 25 links is unreadable. */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {sections.map((section, i) => (
+          <div key={section.heading} className={i > 0 ? "mt-5" : undefined}>
+            {!isCollapsed && sections.length > 1 && (
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                {section.heading}
+              </p>
+            )}
+            <ul className="space-y-1">
+              {section.items.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <li key={item.path}>
+                    <button
+                      onClick={() => {
+                        navigate(item.path);
+                        setIsMobileOpen(false);
+                      }}
+                      title={isCollapsed ? item.label : undefined}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 font-medium text-sm",
+                        isActive
+                          ? `${roleColors[normalizedRole]} text-white shadow-sm`
+                          : "text-slate-700 hover:text-slate-900 hover:bg-slate-100",
+                        isCollapsed && "justify-center"
+                      )}
+                    >
+                      <item.icon className="w-5 h-5 flex-shrink-0" />
+                      {!isCollapsed && <span>{item.label}</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       {/* User Profile */}

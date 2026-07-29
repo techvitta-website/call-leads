@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { getCurrentUser, getDealStages, createDealStage, updateDealStage, deleteDealStage, getUserRole } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
+import { isStaff, normalizeRole } from "@/lib/roles";
 
 const ManagerDealStages = () => {
   const [loading, setLoading] = useState(true);
@@ -30,7 +31,10 @@ const ManagerDealStages = () => {
         }
 
         const userRole = await getUserRole(user.id);
-        if (!userRole || userRole !== 'manager') {
+                // Authorization is enforced by the route's allow-list; this is a
+        // second line of defence. It used to compare against 'manager'
+        // exactly, which bounced owners and super admins off the page.
+        if (!isStaff(normalizeRole(userRole))) {
           navigate('/', { replace: true });
           return;
         }

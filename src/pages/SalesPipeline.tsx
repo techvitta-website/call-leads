@@ -47,8 +47,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
-type UserRole = "owner" | "manager" | "salesman";
 import { formatDistanceToNow } from "date-fns";
+import type { Role as UserRole } from "@/lib/roles";
 
 type StageKey = "new" | "qualified" | "proposal" | "closed_won" | "not_interested";
 

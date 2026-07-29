@@ -116,6 +116,7 @@ export const deleteTeam = async (id: string) => {
   }
 };
 import { createClient } from '@supabase/supabase-js';
+import type { Role as UserRole } from "@/lib/roles";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://uvqlonqtlqypxqatgbih.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_A8iz_SOWHx_G5eKQZGgfMg_csYrQ5Q8';
@@ -160,7 +161,7 @@ export const testConnection = async () => {
   }
 };
 
-export const signUpWithEmail = async (email: string, password: string, fullName: string, role: 'owner' | 'manager' | 'salesman' = 'salesman') => {
+export const signUpWithEmail = async (email: string, password: string, fullName: string, role: UserRole = 'salesman') => {
   try {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -327,7 +328,7 @@ export const getUserById = async (id: string, forceRefresh: boolean = true) => {
   }
 };
 
-export const getUsersByRole = async (role: 'owner' | 'manager' | 'salesman') => {
+export const getUsersByRole = async (role: UserRole) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -344,7 +345,7 @@ export const getUsersByRole = async (role: 'owner' | 'manager' | 'salesman') => 
 export const createUser = async (userData: {
   email: string;
   full_name: string;
-  role: 'owner' | 'manager' | 'salesman';
+  role: UserRole;
   phone?: string;
   avatar_url?: string;
   manager_id?: string;
@@ -1270,7 +1271,6 @@ export const getProjectStats = async (projectId: string) => {
 // ROLE UTILITIES - Single source of truth for role checking
 // ============================================================================
 
-type UserRole = "owner" | "manager" | "salesman";
 
 /**
  * Normalizes role value to valid UserRole or null

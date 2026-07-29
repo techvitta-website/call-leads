@@ -5,6 +5,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser, getUserRole } from "@/lib/supabase";
+import { isStaff, normalizeRole } from "@/lib/roles";
 
 const ManagerInvoices = () => {
   const [loading, setLoading] = useState(true);
@@ -19,7 +20,10 @@ const ManagerInvoices = () => {
           return;
         }
         const role = await getUserRole(user.id);
-        if (role !== "manager") {
+                // Authorization is enforced by the route's allow-list; this is a
+        // second line of defence. It used to compare against 'manager'
+        // exactly, which bounced owners and super admins off the page.
+        if (!isStaff(normalizeRole(role))) {
           navigate("/", { replace: true });
           return;
         }

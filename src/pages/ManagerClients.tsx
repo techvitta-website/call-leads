@@ -9,6 +9,7 @@ import { formatCurrency } from "@/utils/currency";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isStaff, normalizeRole } from "@/lib/roles";
 
 const ManagerClients = () => {
   const [loading, setLoading] = useState(true);
@@ -34,7 +35,10 @@ const ManagerClients = () => {
         }
 
         const userRole = await getUserRole(user.id);
-        if (!userRole || userRole !== 'manager') {
+                // Authorization is enforced by the route's allow-list; this is a
+        // second line of defence. It used to compare against 'manager'
+        // exactly, which bounced owners and super admins off the page.
+        if (!isStaff(normalizeRole(userRole))) {
           navigate('/', { replace: true });
           return;
         }
@@ -115,7 +119,10 @@ const ManagerClients = () => {
   const salespersonOptions = [
     { id: "all", name: "All Salespeople" },
     ...users
-      .filter((u: any) => String(u.role || "").toLowerCase().includes("sales") || u.role === "manager")
+      // Anyone with a real role can own a client relationship. Naming the
+      // roles inline left administrators out, so their clients rendered as
+      // unattributed.
+      .filter((u: any) => normalizeRole(u.role) !== null)
       .map((u: any) => ({ id: u.id, name: u.full_name || u.email || "Unknown" })),
   ];
 

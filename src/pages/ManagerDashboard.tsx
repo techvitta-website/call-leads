@@ -15,12 +15,13 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
-type UserRole = "owner" | "manager" | "salesman";
+
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { isStaff, normalizeRole, homeFor } from "@/lib/roles";
 
 const ManagerDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -110,13 +111,10 @@ const ManagerDashboard = () => {
         // Use centralized role check - always gets fresh data from DB
         const userRole = await getUserRole(user.id);
         
-        if (!userRole || userRole !== 'manager') {
-          const roleRoutes: Record<string, string> = { 
-            owner: '/owner',
-            salesman: '/salesman',
-            manager: '/manager'
-          };
-          navigate(roleRoutes[userRole as UserRole] || '/', { replace: true });
+        // Administrators are allowed to look at the manager dashboard rather
+        // than being redirected off it — they oversee this work.
+        if (!isStaff(normalizeRole(userRole))) {
+          navigate(homeFor(normalizeRole(userRole)), { replace: true });
           return;
         }
         

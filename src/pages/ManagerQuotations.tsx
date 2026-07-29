@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getCurrentUser, getQuotations, createQuotation, updateQuotation, deleteQuotation, getQuotation, getLeads, getProjects, getUserRole } from "@/lib/supabase";
 import { formatCurrency } from "@/utils/currency";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { isStaff, normalizeRole } from "@/lib/roles";
 
 const ManagerQuotations = () => {
   const [loading, setLoading] = useState(true);
@@ -55,7 +56,10 @@ const ManagerQuotations = () => {
         }
 
         const userRole = await getUserRole(user.id);
-        if (!userRole || userRole !== 'manager') {
+                // Authorization is enforced by the route's allow-list; this is a
+        // second line of defence. It used to compare against 'manager'
+        // exactly, which bounced owners and super admins off the page.
+        if (!isStaff(normalizeRole(userRole))) {
           navigate('/', { replace: true });
           return;
         }

@@ -39,15 +39,20 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-
-type Role = "owner" | "manager" | "salesman";
+import { RANK, isAdmin, type Role } from "@/lib/roles";
 
 const ROLE_META: Record<Role, { label: string; icon: any; cls: string; can: string }> = {
+  super_admin: {
+    label: "Super Admin",
+    icon: ShieldCheck,
+    cls: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    can: "Every feature in the application, and the only role that can appoint or remove another super admin.",
+  },
   owner: {
     label: "Owner",
     icon: Crown,
     cls: "bg-amber-100 text-amber-800 border-amber-200",
-    can: "Everything, including managing roles and passwords for everyone.",
+    can: "Everything except managing a super admin. Can change roles up to owner and reset anyone else's password.",
   },
   manager: {
     label: "Manager",
@@ -162,7 +167,9 @@ export default function ManagerAccess() {
     return () => clearTimeout(t);
   }, [notice]);
 
-  const isOwner = meRole === "owner";
+  // "Can this person administer others freely?" — true for both admin tiers.
+  const canAdminister = isAdmin(meRole);
+  const myRank = meRole ? RANK[meRole] : 0;
   // Prefer the role the server just told us; fall back to the client hook
   // while the first request is still in flight.
   const sidebarRole = (meRole ?? userRole ?? "manager") as Role;
@@ -211,7 +218,7 @@ export default function ManagerAccess() {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <DashboardSidebar role="manager" />
+      <DashboardSidebar role={sidebarRole} />
       <main className="flex-1 overflow-auto p-4 pt-20 sm:pt-16 lg:p-8 lg:pt-8">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -244,12 +251,12 @@ export default function ManagerAccess() {
           </div>
         </div>
 
-        {!isOwner && (
+        {!canAdminister && (
           <Alert className="mb-4 border-blue-200 bg-blue-50">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
               You're signed in as a manager. You can add salespeople and reset their
-              passwords, but only an owner can change anyone's role.
+              passwords, but only an administrator can change anyone's role.
             </AlertDescription>
           </Alert>
         )}
@@ -315,7 +322,11 @@ export default function ManagerAccess() {
             const m = ROLE_META[role] ?? ROLE_META.salesman;
             const Icon = m.icon;
             const isMe = u.id === meId;
-            const canTouch = isOwner || role === "salesman";
+                        // You may only act on someone you outrank, or on a peer if you
+            // are an administrator. An owner cannot touch a super admin.
+            const canTouch = canAdminister
+              ? RANK[role] <= myRank
+              : role === "salesman";
 
             return (
               <Card
@@ -364,25 +375,31 @@ export default function ManagerAccess() {
 
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Role. Locked on your own account: demoting yourself
-                        would take away this page and you'd need another owner
+                        would take away this page and you'd need another administrator
                         to undo it. Same reasoning as the self-suspend guard. */}
                     <Select
                       value={role}
-                      disabled={!isOwner || isMe || busy === `role-${u.id}`}
+                      disabled={!canAdminister || isMe || busy === `role-${u.id}`}
                       onValueChange={(v) =>
                         run(`role-${u.id}`, { action: "set_role", userId: u.id, role: v })
                       }
                     >
                       <SelectTrigger
                         className="h-8 w-36 text-xs"
-                        title={isMe ? "Another owner has to change your own role" : undefined}
+                        title={isMe ? "Another administrator has to change your own role" : undefined}
                       >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="owner">Owner</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="salesman">Salesperson</SelectItem>
+                        {/* You cannot grant a role above your own, so an
+                            owner never sees Super Admin as an option. */}
+                        {(["super_admin", "owner", "manager", "salesman"] as Role[])
+                          .filter((r) => RANK[r] <= myRank)
+                          .map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {ROLE_META[r].label}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
 
@@ -457,7 +474,7 @@ export default function ManagerAccess() {
 
         {/* Sign-ins that belong to nobody. They authenticate but carry no
             role, so they show up nowhere else in the app. */}
-        {isOwner && orphans.length > 0 && (
+        {canAdminister && orphans.length > 0 && (
           <Card className="mt-6 border-amber-200 bg-amber-50 p-5">
             <div className="mb-2 flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-amber-700" />
@@ -539,13 +556,15 @@ export default function ManagerAccess() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="salesman">Salesperson</SelectItem>
-                    <SelectItem value="manager" disabled={!isOwner}>
-                      Manager {!isOwner && "(owner only)"}
-                    </SelectItem>
-                    <SelectItem value="owner" disabled={!isOwner}>
-                      Owner {!isOwner && "(owner only)"}
-                    </SelectItem>
+                    {(["salesman", "manager", "owner", "super_admin"] as Role[]).map((r) => {
+                      const allowed = r === "salesman" ? true : canAdminister && RANK[r] <= myRank;
+                      return (
+                        <SelectItem key={r} value={r} disabled={!allowed}>
+                          {ROLE_META[r].label}
+                          {!allowed && " (not available to you)"}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 <p className="mt-1 text-xs text-slate-500">{ROLE_META[newRole].can}</p>
