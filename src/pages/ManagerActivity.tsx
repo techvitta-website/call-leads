@@ -42,6 +42,8 @@ type Salesman = {
   id: string;
   full_name: string;
   email: string;
+  /** Eligible for round-robin auto-assignment. Absent on older rows. */
+  receives_leads?: boolean;
 };
 
 type Team = {

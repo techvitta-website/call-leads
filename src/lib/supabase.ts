@@ -473,6 +473,9 @@ export const createLead = async (leadData: {
   reference_url2?: string | null;
   reference_url3?: string | null;
   list_name?: string | null;
+  priority?: string | null;
+  industry?: string | null;
+  software_category?: string | null;
 }) => {
   try {
     const currentUser = await getCurrentUser();
@@ -2230,6 +2233,383 @@ export const deletePurchaseOrder = async (id: string) => {
     return { error: null };
   } catch (error) {
     logSupabaseError('deletePurchaseOrder', error);
+    return { error: error as any };
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// Saved searches, static lists, and outreach sequences
+//
+// A SEGMENT is a live query — it re-evaluates every time you apply it.
+// A LIST is frozen membership — you curated it once and it stays put.
+// Keeping them distinct means "why did this lead disappear from my
+// list?" always has an answer.
+// ═══════════════════════════════════════════════════════════════
+
+export interface LeadSegment {
+  id: string;
+  name: string;
+  description?: string | null;
+  project_id?: string | null;
+  filters: Record<string, any>;
+  targeting: Record<string, any>;
+  is_shared: boolean;
+  created_by?: string | null;
+  created_at: string;
+  last_used_at?: string | null;
+}
+
+export const getLeadSegments = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('lead_segments')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { data: (data || []) as LeadSegment[], error: null };
+  } catch (error) {
+    logSupabaseError('getLeadSegments', error);
+    return { data: [] as LeadSegment[], error: error as any };
+  }
+};
+
+export const createLeadSegment = async (segment: {
+  name: string;
+  description?: string | null;
+  project_id?: string | null;
+  filters?: Record<string, any>;
+  targeting?: Record<string, any>;
+}) => {
+  try {
+    const user = await getCurrentUser();
+    const { data, error } = await supabase
+      .from('lead_segments')
+      .insert({
+        name: segment.name,
+        description: segment.description || null,
+        project_id: segment.project_id || null,
+        filters: segment.filters || {},
+        targeting: segment.targeting || {},
+        created_by: user?.id || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return { data: data as LeadSegment, error: null };
+  } catch (error) {
+    logSupabaseError('createLeadSegment', error);
+    return { data: null, error: error as any };
+  }
+};
+
+export const updateLeadSegment = async (id: string, patch: Partial<LeadSegment>) => {
+  try {
+    const { data, error } = await supabase
+      .from('lead_segments')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return { data: data as LeadSegment, error: null };
+  } catch (error) {
+    logSupabaseError('updateLeadSegment', error);
+    return { data: null, error: error as any };
+  }
+};
+
+export const deleteLeadSegment = async (id: string) => {
+  try {
+    const { error } = await supabase.from('lead_segments').delete().eq('id', id);
+    if (error) throw error;
+    return { error: null };
+  } catch (error) {
+    logSupabaseError('deleteLeadSegment', error);
+    return { error: error as any };
+  }
+};
+
+export const touchSegment = (id: string) =>
+  supabase
+    .from('lead_segments')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', id)
+    .then(() => {}, () => {});
+
+// ── Static lists ───────────────────────────────────────────────
+
+export const getStaticLists = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('static_lists')
+      .select('*, static_list_members(lead_id)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return {
+      data: (data || []).map((l: any) => ({
+        ...l,
+        member_count: l.static_list_members?.length ?? 0,
+        member_ids: (l.static_list_members || []).map((m: any) => m.lead_id),
+      })),
+      error: null,
+    };
+  } catch (error) {
+    logSupabaseError('getStaticLists', error);
+    return { data: [] as any[], error: error as any };
+  }
+};
+
+export const createStaticList = async (list: {
+  name: string;
+  description?: string | null;
+  project_id?: string | null;
+  leadIds?: string[];
+}) => {
+  try {
+    const user = await getCurrentUser();
+    const { data, error } = await supabase
+      .from('static_lists')
+      .insert({
+        name: list.name,
+        description: list.description || null,
+        project_id: list.project_id || null,
+        created_by: user?.id || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    if (list.leadIds?.length) {
+      await addLeadsToList(data.id, list.leadIds);
+    }
+    return { data, error: null };
+  } catch (error) {
+    logSupabaseError('createStaticList', error);
+    return { data: null, error: error as any };
+  }
+};
+
+export const addLeadsToList = async (listId: string, leadIds: string[]) => {
+  try {
+    const user = await getCurrentUser();
+    // upsert so re-adding an existing member is a no-op rather than an error
+    const { error } = await supabase.from('static_list_members').upsert(
+      leadIds.map((lead_id) => ({
+        list_id: listId,
+        lead_id,
+        added_by: user?.id || null,
+      })),
+      { onConflict: 'list_id,lead_id', ignoreDuplicates: true }
+    );
+    if (error) throw error;
+    return { error: null };
+  } catch (error) {
+    logSupabaseError('addLeadsToList', error);
+    return { error: error as any };
+  }
+};
+
+export const removeLeadFromList = async (listId: string, leadId: string) => {
+  try {
+    const { error } = await supabase
+      .from('static_list_members')
+      .delete()
+      .eq('list_id', listId)
+      .eq('lead_id', leadId);
+    if (error) throw error;
+    return { error: null };
+  } catch (error) {
+    logSupabaseError('removeLeadFromList', error);
+    return { error: error as any };
+  }
+};
+
+export const deleteStaticList = async (id: string) => {
+  try {
+    const { error } = await supabase.from('static_lists').delete().eq('id', id);
+    if (error) throw error;
+    return { error: null };
+  } catch (error) {
+    logSupabaseError('deleteStaticList', error);
+    return { error: error as any };
+  }
+};
+
+// ── Sequences ──────────────────────────────────────────────────
+
+export const getSequences = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('sequences')
+      .select('*, sequence_steps(*), sequence_enrollments(id, status)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return {
+      data: (data || []).map((s: any) => ({
+        ...s,
+        steps: (s.sequence_steps || []).sort(
+          (a: any, b: any) => a.step_order - b.step_order
+        ),
+        active_count: (s.sequence_enrollments || []).filter(
+          (e: any) => e.status === 'active'
+        ).length,
+        total_enrolled: (s.sequence_enrollments || []).length,
+      })),
+      error: null,
+    };
+  } catch (error) {
+    logSupabaseError('getSequences', error);
+    return { data: [] as any[], error: error as any };
+  }
+};
+
+export const createSequence = async (seq: {
+  name: string;
+  description?: string | null;
+  project_id?: string | null;
+  stop_on_reply?: boolean;
+  steps: Array<{
+    step_type: string;
+    wait_days: number;
+    subject?: string | null;
+    body?: string | null;
+    config?: Record<string, any>;
+  }>;
+}) => {
+  try {
+    const user = await getCurrentUser();
+    const { data, error } = await supabase
+      .from('sequences')
+      .insert({
+        name: seq.name,
+        description: seq.description || null,
+        project_id: seq.project_id || null,
+        stop_on_reply: seq.stop_on_reply ?? true,
+        created_by: user?.id || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    if (seq.steps?.length) {
+      const { error: stepErr } = await supabase.from('sequence_steps').insert(
+        seq.steps.map((s, i) => ({
+          sequence_id: data.id,
+          step_order: i + 1,
+          step_type: s.step_type,
+          wait_days: Number(s.wait_days) || 0,
+          subject: s.subject || null,
+          body: s.body || null,
+          config: s.config || {},
+        }))
+      );
+      if (stepErr) throw stepErr;
+    }
+    return { data, error: null };
+  } catch (error) {
+    logSupabaseError('createSequence', error);
+    return { data: null, error: error as any };
+  }
+};
+
+export const deleteSequence = async (id: string) => {
+  try {
+    const { error } = await supabase.from('sequences').delete().eq('id', id);
+    if (error) throw error;
+    return { error: null };
+  } catch (error) {
+    logSupabaseError('deleteSequence', error);
+    return { error: error as any };
+  }
+};
+
+export const setSequenceEnabled = async (id: string, enabled: boolean) => {
+  try {
+    const { error } = await supabase.from('sequences').update({ enabled }).eq('id', id);
+    if (error) throw error;
+    return { error: null };
+  } catch (error) {
+    logSupabaseError('setSequenceEnabled', error);
+    return { error: error as any };
+  }
+};
+
+/** Enrol leads. Already-enrolled leads are skipped, not duplicated. */
+export const enrollLeadsInSequence = async (sequenceId: string, leadIds: string[]) => {
+  try {
+    const user = await getCurrentUser();
+
+    const { data: firstStep } = await supabase
+      .from('sequence_steps')
+      .select('wait_days')
+      .eq('sequence_id', sequenceId)
+      .eq('step_order', 1)
+      .maybeSingle();
+
+    if (!firstStep) {
+      throw new Error('This sequence has no steps yet, so there is nothing to enrol into.');
+    }
+
+    const start = new Date();
+    start.setDate(start.getDate() + (Number(firstStep.wait_days) || 0));
+
+    const { data, error } = await supabase
+      .from('sequence_enrollments')
+      .upsert(
+        leadIds.map((lead_id) => ({
+          sequence_id: sequenceId,
+          lead_id,
+          status: 'active',
+          current_step: 0,
+          next_action_at: start.toISOString(),
+          enrolled_by: user?.id || null,
+        })),
+        { onConflict: 'sequence_id,lead_id', ignoreDuplicates: true }
+      )
+      .select();
+
+    if (error) throw error;
+    return { data: data || [], enrolled: (data || []).length, error: null };
+  } catch (error) {
+    logSupabaseError('enrollLeadsInSequence', error);
+    return { data: [], enrolled: 0, error: error as any };
+  }
+};
+
+export const getMySequenceTasks = async (userId?: string) => {
+  try {
+    let q = supabase
+      .from('sequence_tasks')
+      .select('*, leads(id, company_name, contact_name, phone, email, status)')
+      .is('completed_at', null)
+      .order('due_at', { ascending: true });
+
+    if (userId) q = q.eq('assigned_to', userId);
+
+    const { data, error } = await q.limit(200);
+    if (error) throw error;
+    return { data: data || [], error: null };
+  } catch (error) {
+    logSupabaseError('getMySequenceTasks', error);
+    return { data: [] as any[], error: error as any };
+  }
+};
+
+export const completeSequenceTask = async (taskId: string, skipped = false) => {
+  try {
+    const user = await getCurrentUser();
+    const { error } = await supabase
+      .from('sequence_tasks')
+      .update({
+        completed_at: new Date().toISOString(),
+        completed_by: user?.id || null,
+        skipped,
+      })
+      .eq('id', taskId);
+    if (error) throw error;
+    return { error: null };
+  } catch (error) {
+    logSupabaseError('completeSequenceTask', error);
     return { error: error as any };
   }
 };

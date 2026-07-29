@@ -140,9 +140,11 @@ export function NotificationBell({ userId }: NotificationBellProps) {
         },
       )
       .subscribe((status) => {
-        if (status === "SUBSCRIPTION_ERROR") {
+        // supabase-js renamed this state; "SUBSCRIPTION_ERROR" never matched,
+        // so realtime failures were being swallowed silently.
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           console.error(
-            "[NotificationBell] Realtime subscription error for user:",
+            `[NotificationBell] Realtime subscription ${status} for user:`,
             userId,
           );
         }

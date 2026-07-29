@@ -1,3 +1,4 @@
+import { formatCurrencyCompact } from "@/utils/currency";
 import { Search, Filter, ChevronDown, Phone, MessageSquare, MoreHorizontal, Loader, X, Clock, TrendingUp, AlertCircle, MessageCircle, StickyNote, Calendar, Mail } from "lucide-react";
 import {
   DropdownMenu,

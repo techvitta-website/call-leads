@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Loader, CheckCircle, Clock, XCircle, AlertCircle, Filter, Search, Mail, Phone as PhoneIcon, Briefcase, Upload, FileSpreadsheet, UserPlus, MoreHorizontal, Edit, Trash2, ChevronDown, Download, X, StickyNote, Calendar, MessageCircle, CalendarCheck, Sparkles } from "lucide-react";
+import { Plus, Loader, CheckCircle, Clock, XCircle, AlertCircle, Filter, Search, Mail, Phone as PhoneIcon, Briefcase, Upload, FileSpreadsheet, UserPlus, MoreHorizontal, Edit, Trash2, ChevronDown, Download, X, StickyNote, Calendar, MessageCircle, CalendarCheck, Sparkles, ListPlus, Send } from "lucide-react";
 import AILeadGenerationDialog from "@/components/AILeadGenerationDialog";
 import AILeadScoringDialog from "@/components/AILeadScoringDialog";
 import WhatsAppSender from "@/components/WhatsAppSender";
@@ -16,10 +16,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getLeads, getCurrentUser, getUsers, createLead, updateLead, getProjects, deleteLead, testConnection, subscribeToUsers, subscribeToLeads, getActivitiesForLead, subscribeToLeadActivities, createBulkLeads, createLeadActivity } from "@/lib/supabase";
+import { getLeads, getCurrentUser, getUsers, createLead, updateLead, getProjects, deleteLead, testConnection, subscribeToUsers, subscribeToLeads, getActivitiesForLead, subscribeToLeadActivities, createBulkLeads, createLeadActivity, supabase, getLeadSegments, createLeadSegment, deleteLeadSegment, touchSegment, getStaticLists, createStaticList, addLeadsToList, getSequences, enrollLeadsInSequence, type LeadSegment } from "@/lib/supabase";
 import { formatCurrency, formatCurrencyCompact } from "@/utils/currency";
 import * as XLSX from "xlsx";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -118,6 +118,24 @@ const ManagerLeads = () => {
   const [doNotFollowupOnly, setDoNotFollowupOnly] = useState<boolean>(false);
   const [hasTags, setHasTags] = useState<boolean>(false);
   const [tagQuery, setTagQuery] = useState<string>("");
+
+  // ── Saved searches, lists, sequences ─────────────────────────
+  const [segments, setSegments] = useState<LeadSegment[]>([]);
+  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+  const [showSaveSegment, setShowSaveSegment] = useState(false);
+  const [segmentName, setSegmentName] = useState("");
+  const [savingSegment, setSavingSegment] = useState(false);
+  const [staticLists, setStaticLists] = useState<any[]>([]);
+  const [showAddToList, setShowAddToList] = useState(false);
+  const [targetListId, setTargetListId] = useState<string>("");
+  const [newListName, setNewListName] = useState("");
+  const [addingToList, setAddingToList] = useState(false);
+  const [sequences, setSequences] = useState<any[]>([]);
+  const [showEnroll, setShowEnroll] = useState(false);
+  const [targetSequenceId, setTargetSequenceId] = useState<string>("");
+  const [enrolling, setEnrolling] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
   const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -392,6 +410,29 @@ const ManagerLeads = () => {
       }
     };
     fetchLeads();
+
+    // Saved searches, lists and sequences — independent of the leads fetch,
+    // so a failure here never blocks the table from rendering.
+    (async () => {
+      const [segRes, listRes, seqRes] = await Promise.all([
+        getLeadSegments(),
+        getStaticLists(),
+        getSequences(),
+      ]);
+      setSegments(segRes.data);
+      setStaticLists(listRes.data);
+      setSequences(seqRes.data.filter((s: any) => s.enabled && s.steps?.length));
+
+      // Deep link from Lists & Saved Searches: /manager/leads?segment=<id>
+      const wanted = searchParams.get("segment");
+      if (wanted) {
+        const seg = segRes.data.find((s) => s.id === wanted);
+        if (seg) applySegment(seg);
+        const next = new URLSearchParams(searchParams);
+        next.delete("segment");
+        setSearchParams(next, { replace: true });
+      }
+    })();
 
     // Realtime: listen for leads changes and refresh
     const leadSub = subscribeToLeads(async () => {
@@ -829,7 +870,7 @@ const ManagerLeads = () => {
         "Organization", "organization", "Org", "org"
       ]) || Object.values(row)[0] || "";
       
-      if (!companyName || companyName.trim() === "") {
+      if (!companyName || String(companyName).trim() === "") {
         return null; // Skip rows without company name
       }
 
@@ -1336,6 +1377,126 @@ const ManagerLeads = () => {
     return normalizedLeadStatus === normalizedFilterStatus || leadStatus === filterStatus;
   };
 
+  // Auto-dismiss the confirmation toast.
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // ── Saved searches ───────────────────────────────────────────
+  // A segment stores exactly the filter state below, so applying one is
+  // just restoring that state — the same code path a human typing filters
+  // takes. No second filtering implementation to keep in sync.
+  const currentFilters = () => ({
+    statusFilter, assigneeFilter, searchTerm, sourceFilter, priorityFilter,
+    softwareCategoryFilter, industryFilter, countryFilter, stateFilter, cityFilter,
+    valueMin, valueMax, scoreMin, scoreMax, followupAfter, followupBefore,
+    doNotFollowupOnly, hasTags, tagQuery,
+    projectId: selectedProject?.id ?? null,
+  });
+
+  const applySegment = (seg: LeadSegment) => {
+    const f: any = seg.filters || {};
+    setStatusFilter(f.statusFilter ?? "all");
+    setAssigneeFilter(f.assigneeFilter ?? "all");
+    setSearchTerm(f.searchTerm ?? "");
+    setSourceFilter(f.sourceFilter ?? "all");
+    setPriorityFilter(f.priorityFilter ?? "all");
+    setSoftwareCategoryFilter(f.softwareCategoryFilter ?? "all");
+    setIndustryFilter(f.industryFilter ?? "all");
+    setCountryFilter(f.countryFilter ?? "");
+    setStateFilter(f.stateFilter ?? "");
+    setCityFilter(f.cityFilter ?? "");
+    setValueMin(f.valueMin ?? "");
+    setValueMax(f.valueMax ?? "");
+    setScoreMin(f.scoreMin ?? "");
+    setScoreMax(f.scoreMax ?? "");
+    setFollowupAfter(f.followupAfter ?? "");
+    setFollowupBefore(f.followupBefore ?? "");
+    setDoNotFollowupOnly(Boolean(f.doNotFollowupOnly));
+    setHasTags(Boolean(f.hasTags));
+    setTagQuery(f.tagQuery ?? "");
+
+    const proj = f.projectId ? projects.find((p: any) => p.id === f.projectId) : null;
+    setSelectedProject(proj ?? null);
+
+    setActiveSegmentId(seg.id);
+    touchSegment(seg.id);
+    setToast(`Applied “${seg.name}”`);
+  };
+
+  const handleSaveSegment = async () => {
+    if (!segmentName.trim()) return;
+    setSavingSegment(true);
+    const { data, error } = await createLeadSegment({
+      name: segmentName.trim(),
+      project_id: selectedProject?.id ?? null,
+      filters: currentFilters(),
+    });
+    setSavingSegment(false);
+    if (error) {
+      setToast(`Could not save: ${error.message}`);
+      return;
+    }
+    setSegments((prev) => [data as LeadSegment, ...prev]);
+    setActiveSegmentId(data?.id ?? null);
+    setSegmentName("");
+    setShowSaveSegment(false);
+    setToast(`Saved “${data?.name}”`);
+  };
+
+  const handleAddToList = async () => {
+    const ids = Array.from(selectedLeadIds);
+    if (ids.length === 0) return;
+    setAddingToList(true);
+    try {
+      if (targetListId === "__new__") {
+        if (!newListName.trim()) return;
+        const { data, error } = await createStaticList({
+          name: newListName.trim(),
+          project_id: selectedProject?.id ?? null,
+          leadIds: ids,
+        });
+        if (error) throw error;
+        setStaticLists((prev) => [{ ...data, member_count: ids.length }, ...prev]);
+        setToast(`Created “${data?.name}” with ${ids.length} lead${ids.length !== 1 ? "s" : ""}`);
+      } else {
+        const { error } = await addLeadsToList(targetListId, ids);
+        if (error) throw error;
+        const list = staticLists.find((l) => l.id === targetListId);
+        setToast(`Added ${ids.length} lead${ids.length !== 1 ? "s" : ""} to “${list?.name}”`);
+        setStaticLists(await getStaticLists().then((r) => r.data));
+      }
+      setShowAddToList(false);
+      setNewListName("");
+      setSelectedLeadIds(new Set());
+    } catch (e: any) {
+      setToast(`Could not add to list: ${e?.message || e}`);
+    } finally {
+      setAddingToList(false);
+    }
+  };
+
+  const handleEnroll = async () => {
+    const ids = Array.from(selectedLeadIds);
+    if (ids.length === 0 || !targetSequenceId) return;
+    setEnrolling(true);
+    const { enrolled, error } = await enrollLeadsInSequence(targetSequenceId, ids);
+    setEnrolling(false);
+    if (error) {
+      setToast(`Could not enrol: ${error.message}`);
+      return;
+    }
+    const skipped = ids.length - enrolled;
+    setToast(
+      `Enrolled ${enrolled} lead${enrolled !== 1 ? "s" : ""}` +
+        (skipped > 0 ? ` — ${skipped} already in this sequence` : "")
+    );
+    setShowEnroll(false);
+    setSelectedLeadIds(new Set());
+  };
+
   // Fix: filteredLeads should show all leads when selectedProject is null
   const filteredLeads = leads.filter((lead) => {
     const matchesStatus = statusFilter === 'all' || normalizeStatus(lead.status) === statusFilter;
@@ -1544,8 +1705,77 @@ const ManagerLeads = () => {
 
 
 
+        {/* Confirmation toast */}
+        {toast && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            {toast}
+          </div>
+        )}
+
         {/* Filters/Search Bar with Project Selector */}
         <Card className="p-4 bg-white border-slate-200 shadow-sm mb-4">
+          {/* ── Row 0: Saved searches ──────────────────────────────────── */}
+          <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1">
+            <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-slate-400">
+              Saved
+            </span>
+
+            {segments.length === 0 && (
+              <span className="shrink-0 text-xs text-slate-400">
+                None yet — set some filters, then save them for one-click reuse.
+              </span>
+            )}
+
+            {segments.map((seg) => {
+              const active = activeSegmentId === seg.id;
+              return (
+                <div key={seg.id} className="group relative shrink-0">
+                  <button
+                    onClick={() => applySegment(seg)}
+                    title={
+                      seg.project_id
+                        ? `${seg.name} — ${projects.find((p: any) => p.id === seg.project_id)?.name ?? "project"}`
+                        : seg.name
+                    }
+                    className={`whitespace-nowrap rounded-full border px-3 py-1 pr-6 text-xs transition-colors ${
+                      active
+                        ? "border-blue-500 bg-blue-600 text-white"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                    }`}
+                  >
+                    {seg.name}
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm(`Delete the saved search “${seg.name}”?`)) return;
+                      await deleteLeadSegment(seg.id);
+                      setSegments((prev) => prev.filter((s) => s.id !== seg.id));
+                      if (activeSegmentId === seg.id) setActiveSegmentId(null);
+                    }}
+                    className={`absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 opacity-0 transition-opacity group-hover:opacity-100 ${
+                      active ? "text-white hover:bg-blue-700" : "text-slate-400 hover:bg-slate-100"
+                    }`}
+                    aria-label={`Delete ${seg.name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSaveSegment(true)}
+              className="ml-auto h-7 shrink-0 gap-1 whitespace-nowrap border-dashed text-xs"
+            >
+              <Plus className="h-3 w-3" />
+              Save current filters
+            </Button>
+          </div>
+
           {/* ── Row 1: Filters ─────────────────────────────────────────── */}
           <div className="flex flex-wrap items-center gap-3 mb-3">
             <div className="flex-none min-w-[150px] max-w-[200px]">
@@ -2052,6 +2282,33 @@ const ManagerLeads = () => {
                       Assign to Salesman
                     </Button>
                     <Button
+                      onClick={() => {
+                        setTargetListId(staticLists[0]?.id ?? "__new__");
+                        setShowAddToList(true);
+                      }}
+                      variant="outline"
+                      className="border-slate-300"
+                    >
+                      <ListPlus className="w-4 h-4 mr-2" />
+                      Add to List
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setTargetSequenceId(sequences[0]?.id ?? "");
+                        setShowEnroll(true);
+                      }}
+                      disabled={sequences.length === 0}
+                      title={
+                        sequences.length === 0
+                          ? "Create a sequence first, under Sequences"
+                          : "Start an outreach cadence for these leads"
+                      }
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Add to Sequence
+                    </Button>
+                    <Button
                       onClick={() => setShowBulkDeleteModal(true)}
                       variant="destructive"
                       className="bg-red-600 hover:bg-red-700 text-white"
@@ -2454,6 +2711,33 @@ const ManagerLeads = () => {
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
                       Assign to Salesman
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setTargetListId(staticLists[0]?.id ?? "__new__");
+                        setShowAddToList(true);
+                      }}
+                      variant="outline"
+                      className="border-slate-300"
+                    >
+                      <ListPlus className="w-4 h-4 mr-2" />
+                      Add to List
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setTargetSequenceId(sequences[0]?.id ?? "");
+                        setShowEnroll(true);
+                      }}
+                      disabled={sequences.length === 0}
+                      title={
+                        sequences.length === 0
+                          ? "Create a sequence first, under Sequences"
+                          : "Start an outreach cadence for these leads"
+                      }
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Add to Sequence
                     </Button>
                     <Button
                       onClick={() => setShowBulkDeleteModal(true)}
@@ -4826,14 +5110,231 @@ const ManagerLeads = () => {
       />
 
 
+      {/* ── Save current filters as a saved search ────────────────── */}
+      <Dialog open={showSaveSegment} onOpenChange={setShowSaveSegment}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save this filter set</DialogTitle>
+            <DialogDescription>
+              Saved searches are live — they re-run every time you apply one, so
+              new leads matching the criteria show up automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="segment-name">Name</Label>
+              <Input
+                id="segment-name"
+                value={segmentName}
+                onChange={(e) => setSegmentName(e.target.value)}
+                placeholder="Hot HRMS leads in Hyderabad"
+                onKeyDown={(e) => e.key === "Enter" && handleSaveSegment()}
+              />
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+              <div className="mb-1 font-medium text-slate-700">Capturing</div>
+              {(() => {
+                const f: any = currentFilters();
+                const parts: string[] = [];
+                if (selectedProject) parts.push(`Project: ${selectedProject.name}`);
+                if (f.statusFilter !== "all") parts.push(`Status: ${f.statusFilter}`);
+                if (f.assigneeFilter !== "all") parts.push(`Assignee: ${f.assigneeFilter === "unassigned" ? "unassigned" : (salesUsers.find((u: any) => u.id === f.assigneeFilter)?.full_name ?? "someone")}`);
+                if (f.searchTerm) parts.push(`Search: “${f.searchTerm}”`);
+                if (f.sourceFilter !== "all") parts.push(`Source: ${f.sourceFilter}`);
+                if (f.priorityFilter !== "all") parts.push(`Priority: ${f.priorityFilter}`);
+                if (f.industryFilter !== "all") parts.push(`Industry: ${f.industryFilter}`);
+                if (f.softwareCategoryFilter !== "all") parts.push(`Category: ${f.softwareCategoryFilter}`);
+                if (f.countryFilter) parts.push(`Country: ${f.countryFilter}`);
+                if (f.stateFilter) parts.push(`State: ${f.stateFilter}`);
+                if (f.cityFilter) parts.push(`City: ${f.cityFilter}`);
+                if (f.valueMin || f.valueMax) parts.push(`Value ${f.valueMin || "0"}–${f.valueMax || "∞"}`);
+                if (f.scoreMin || f.scoreMax) parts.push(`Score ${f.scoreMin || "0"}–${f.scoreMax || "100"}`);
+                if (f.followupAfter || f.followupBefore) parts.push("Follow-up date range");
+                if (f.doNotFollowupOnly) parts.push("Do-not-follow-up only");
+                if (f.hasTags) parts.push("Has tags");
+                if (f.tagQuery) parts.push(`Tag: ${f.tagQuery}`);
+                return parts.length ? (
+                  <ul className="space-y-0.5">
+                    {parts.map((p) => (
+                      <li key={p}>• {p}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="text-amber-700">
+                    No filters are set — this would match every lead. Set some first.
+                  </span>
+                );
+              })()}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveSegment(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSegment} disabled={savingSegment || !segmentName.trim()}>
+              {savingSegment ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add selected leads to a static list ───────────────────── */}
+      <Dialog open={showAddToList} onOpenChange={setShowAddToList}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Add {selectedLeadIds.size} lead{selectedLeadIds.size !== 1 ? "s" : ""} to a list
+            </DialogTitle>
+            <DialogDescription>
+              A list is a fixed set of leads you picked. Unlike a saved search it
+              doesn't change on its own.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>List</Label>
+              <Select value={targetListId} onValueChange={setTargetListId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a list…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {staticLists.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name} ({l.member_count})
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="__new__">+ Create a new list</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {targetListId === "__new__" && (
+              <div>
+                <Label htmlFor="new-list-name">New list name</Label>
+                <Input
+                  id="new-list-name"
+                  value={newListName}
+                  onChange={(e) => setNewListName(e.target.value)}
+                  placeholder="Q3 outreach batch"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddToList(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddToList}
+              disabled={
+                addingToList ||
+                !targetListId ||
+                (targetListId === "__new__" && !newListName.trim())
+              }
+            >
+              {addingToList ? "Adding…" : "Add"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Enrol selected leads in a sequence ────────────────────── */}
+      <Dialog open={showEnroll} onOpenChange={setShowEnroll}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Start a sequence for {selectedLeadIds.size} lead
+              {selectedLeadIds.size !== 1 ? "s" : ""}
+            </DialogTitle>
+            <DialogDescription>
+              Each step becomes a task for whoever the lead is assigned to. The
+              cadence stops early if the lead replies or the deal closes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Sequence</Label>
+              <Select value={targetSequenceId} onValueChange={setTargetSequenceId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a sequence…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sequences.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name} ({s.steps?.length ?? 0} steps)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {(() => {
+              const seq = sequences.find((s) => s.id === targetSequenceId);
+              if (!seq) return null;
+              return (
+                <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                  <div className="mb-1 font-medium text-slate-700">Steps</div>
+                  <ol className="space-y-0.5">
+                    {(seq.steps || []).map((st: any) => (
+                      <li key={st.id}>
+                        {st.step_order}. {st.step_type}
+                        {st.wait_days > 0 ? ` — after ${st.wait_days} day${st.wait_days !== 1 ? "s" : ""}` : " — same day"}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              );
+            })()}
+            {Array.from(selectedLeadIds).some(
+              (id) => !leads.find((l: any) => l.id === id)?.assigned_to
+            ) && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                Some selected leads are unassigned. Their tasks will be created
+                but won't appear in anyone's queue until you assign an owner.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEnroll(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEnroll} disabled={enrolling || !targetSequenceId}>
+              {enrolling ? "Enrolling…" : "Start sequence"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* AI Lead Scoring Dialog */}
       <AILeadScoringDialog
         open={showScoringDialog}
         onClose={() => setShowScoringDialog(false)}
         leads={filteredLeads}
-        onScoresApplied={(scores) => {
+        onScoresApplied={async (scores) => {
           setAiScores((prev) => ({ ...prev, ...scores }));
           setShowScoringDialog(false);
+
+          // Persist to leads.lead_score. Without this the scores live only in
+          // local state — they vanish on refresh and the Min/Max Score filter
+          // (which reads the DB column) never sees them.
+          const entries = Object.entries(scores);
+          const results = await Promise.all(
+            entries.map(([leadId, score]) =>
+              supabase.from("leads").update({ lead_score: score }).eq("id", leadId)
+            )
+          );
+          const failed = results.filter((r: any) => r?.error).length;
+
+          setLeads((prev: any[]) =>
+            prev.map((l) =>
+              scores[l.id] !== undefined ? { ...l, lead_score: scores[l.id] } : l
+            )
+          );
+
+          if (failed > 0) {
+            alert(
+              `Saved ${entries.length - failed} of ${entries.length} scores. ` +
+                `${failed} could not be written — they'll show until you refresh.`
+            );
+          }
         }}
       />
 
