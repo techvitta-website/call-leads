@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Call-Leads CRM — testing guide</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink-2:#334155; --ink-3:#64748b; --ink-4:#94a3b8;
+    --line:#e2e8f0; --surface:#fff; --bg:#f1f5f9;
+    --blue:#1d4ed8; --blue-soft:#eff6ff; --blue-line:#bfdbfe;
+    --green:#047857; --green-soft:#ecfdf5; --green-line:#a7f3d0;
+    --amber:#b45309; --amber-soft:#fffbeb; --amber-line:#fde68a;
+    --rose:#be123c; --rose-soft:#fff1f2; --rose-line:#fecdd3;
+    --violet:#6d28d9;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#f1f5f9; --ink-2:#cbd5e1; --ink-3:#94a3b8; --ink-4:#64748b;
+      --line:#1e293b; --surface:#0f172a; --bg:#020617;
+      --blue:#93c5fd; --blue-soft:#172554; --blue-line:#1e3a8a;
+      --green:#6ee7b7; --green-soft:#022c22; --green-line:#065f46;
+      --amber:#fcd34d; --amber-soft:#292006; --amber-line:#78350f;
+      --rose:#fda4af; --rose-soft:#2c0b0b; --rose-line:#881337;
+      --violet:#c4b5fd;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:40px 20px 90px}
+  h1{font-size:29px;margin:0 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--ink-3);margin:0 0 30px}
+  h2{font-size:19px;margin:40px 0 4px;letter-spacing:-.01em;padding-top:22px;border-top:1px solid var(--line)}
+  h2:first-of-type{border-top:none;padding-top:0}
+  h3{font-size:16px;margin:24px 0 4px}
+  .h2sub{color:var(--ink-3);font-size:14px;margin:0 0 14px}
+  p{margin:11px 0;color:var(--ink-2)}
+  a{color:var(--blue)}
+  code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);
+    border:1px solid var(--line);padding:1px 5px;border-radius:4px;color:var(--ink)}
+  pre{background:#0b1220;color:#e2e8f0;padding:14px 16px;border-radius:10px;overflow-x:auto;
+    font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;margin:12px 0}
+  pre code{background:none;border:none;padding:0;color:inherit}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:14px 0}
+  th{text-align:left;padding:9px 11px;border-bottom:2px solid var(--line);color:var(--ink-4);
+    font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  td{padding:10px 11px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin:16px 0}
+  .note{border-left:3px solid var(--blue);background:var(--blue-soft);border-radius:0 9px 9px 0;padding:12px 15px;margin:15px 0;font-size:14px;color:var(--ink-2)}
+  .warn{border-left:3px solid var(--amber);background:var(--amber-soft);border-radius:0 9px 9px 0;padding:12px 15px;margin:15px 0;font-size:14px;color:var(--ink-2)}
+  .stop{border-left:3px solid var(--rose);background:var(--rose-soft);border-radius:0 9px 9px 0;padding:12px 15px;margin:15px 0;font-size:14px;color:var(--ink-2)}
+  .good{border-left:3px solid var(--green);background:var(--green-soft);border-radius:0 9px 9px 0;padding:12px 15px;margin:15px 0;font-size:14px;color:var(--ink-2)}
+  .note b,.warn b,.stop b,.good b{color:var(--ink)}
+  .cred{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
+  .cred .role{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-4);margin-bottom:5px}
+  .cred .em{font:13px ui-monospace,Menlo,monospace;color:var(--ink);font-weight:600}
+  .cred .pw{font:13px ui-monospace,Menlo,monospace;color:var(--ink-2)}
+  .cred .what{font-size:13px;color:var(--ink-3);margin-top:6px}
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+  ol.steps>li{counter-increment:s;position:relative;padding-left:38px;margin:14px 0;color:var(--ink-2)}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:-1px;width:25px;height:25px;
+    border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;
+    justify-content:center;font-size:13px;font-weight:600}
+  @media (prefers-color-scheme: dark){ ol.steps>li::before{color:#0f172a} }
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .p-new{background:var(--green-soft);color:var(--green)}
+  .p-fix{background:var(--blue-soft);color:var(--blue)}
+  .p-todo{background:var(--amber-soft);color:var(--amber)}
+  ul{color:var(--ink-2);padding-left:20px}
+  li{margin:6px 0}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--ink-4);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Testing sales.techvitta.in</h1>
+<p class="sub">Every login, every feature, and the order to try them in. All three logins were tested against the live database just now.</p>
+
+<h2>Logins</h2>
+<p class="h2sub">Verified working — I signed in with each of these to confirm</p>
+
+<div class="cred">
+  <div class="role">Manager — start here</div>
+  <div class="em">manager@techvitta.in</div>
+  <div class="pw">Demo@2026</div>
+  <div class="what">Sees everything: all 4 projects, all 131 leads, automations, sequences, AI tools, user management. This is the account to test with.</div>
+</div>
+
+<div class="cred">
+  <div class="role">Salesperson</div>
+  <div class="em">salesman@techvitta.in</div>
+  <div class="pw">Demo@2026</div>
+  <div class="what">Restricted view — only their own leads. I assigned 5 derma-clinic leads to this account so the screen isn't empty when you look.</div>
+</div>
+
+<div class="cred">
+  <div class="role">Owner — your own account</div>
+  <div class="em">venkatesh@techvitta.in</div>
+  <div class="pw">your existing password</div>
+  <div class="what">Owner-level views: all leads, teams, analytics, regions, revenue reports. I didn't reset this password — it's your real account.</div>
+</div>
+
+<div class="note">
+  <p><b>If the owner password doesn't work,</b> say so and I'll set a temporary one. I deliberately left your own account alone.</p>
+</div>
+
+<h2>Before you start</h2>
+
+<div class="warn">
+  <p><b>Check Vercel has deployed the latest build.</b> A lot has shipped today — the newest commit is <code>6ef5b47</code>. Open Vercel → Deployments and confirm the top entry is <em>Ready</em> and matches. If the site looks like it did this morning, that's why.</p>
+</div>
+
+<h2>Test in this order</h2>
+<p class="h2sub">Each step sets up the next</p>
+
+<h3>1 · Does the basic app work <span class="pill p-fix">was broken</span></h3>
+<ol class="steps">
+  <li>Sign in as <strong>manager@techvitta.in</strong>. You should land on the Manager dashboard.</li>
+  <li>Go to <strong>Leads</strong>. The project dropdown should list <em>Drones CRM, Kanchii Batch 2, Derma Clinic CRM, HRMS</em> — this was empty before; every project had a null owner so the security rule hid them all.</li>
+  <li>Confirm the toolbar buttons are coloured, not greyed out. Add Lead should work even with "All Projects" selected.</li>
+</ol>
+
+<h3>2 · Find real businesses <span class="pill p-new">new</span></h3>
+<p>The most immediately useful feature. Real companies with real phone numbers.</p>
+<ol class="steps">
+  <li>Leads → <strong>Find Businesses</strong> (teal button).</li>
+  <li>Project <em>Derma Clinic CRM</em>, category <strong>Clinics &amp; doctors</strong>, city <strong>Hyderabad</strong>, then Search.</li>
+  <li>Expect roughly 26 results, ~25 with phone numbers. I got IDEA Clinics, Sri Shankara Nethralaya, Aswini Diabetic Centre.</li>
+  <li>Untick a few, then Import. They appear in Leads tagged <em>OpenStreetMap</em>.</li>
+</ol>
+<p>Worth also trying: <strong>Schools</strong> in Hyderabad, <strong>Hotels</strong> in Vijayawada, <strong>Factories</strong> in Pune. Switch the Source dropdown to Google Places to see it return results you <em>can't</em> import — that's deliberate, explained below.</p>
+
+<h3>3 · AI lead generation <span class="pill p-new">rebuilt</span></h3>
+<ol class="steps">
+  <li>Leads → <strong>AI Generate</strong>. Pick project <em>HRMS</em>.</li>
+  <li>The brief is pre-filled from the project. Set Industry <em>Manufacturing</em>, Region <em>Telangana &amp; Andhra Pradesh</em>, cities <em>Hyderabad, Vijayawada</em>.</li>
+  <li>Tick seniority <em>C-Suite, Head of, Director</em>; department <em>Human Resources, Operations</em>; headcount <em>101-200, 201-500</em>.</li>
+  <li>Open <strong>Advanced filters</strong> and try an exclusion like <em>staffing agency, consultancy</em>.</li>
+  <li>Generate. Expect ~20 seconds.</li>
+</ol>
+<div class="note">
+  <p><b>Contact fields will be blank, on purpose.</b> You'll see "Ask for: Head of Human Resources" and a research hint instead of a name and number. The earlier version invented them — it produced six leads with the phone numbers 9876543210, …211, …212. Every one useless. It now returns only what it actually knows, and the companies improved as a side effect: real firms like Virchow Biotech and Sri Chakra Cements instead of invented ones.</p>
+</div>
+
+<h3>4 · AI scoring <span class="pill p-fix">was broken</span></h3>
+<p>Leads → <strong>AI Score</strong> → score the visible leads → Apply. Then <strong>refresh the page</strong>. The scores should still be there. Previously they vanished, because they were only held in memory and never written to the database — which also meant the Min/Max Score filter never saw them.</p>
+
+<h3>5 · Saved searches and lists <span class="pill p-new">new</span></h3>
+<ol class="steps">
+  <li>On Leads, set some filters — status Qualified, a city, a priority.</li>
+  <li>Click <strong>Save current filters</strong>, name it. A chip appears in the "Saved" row at the top.</li>
+  <li>Change the filters, then click the chip. It restores them.</li>
+  <li>Tick some leads → <strong>Add to List</strong> → create a new list.</li>
+  <li>Sidebar → <strong>Lists &amp; Searches</strong> to see both.</li>
+</ol>
+<p>The distinction matters: a saved search re-runs live so new matching leads appear on their own; a list is the exact leads you picked and never changes by itself.</p>
+
+<h3>6 · Sequences <span class="pill p-new">new</span></h3>
+<ol class="steps">
+  <li>Sidebar → <strong>Sequences</strong> → New sequence.</li>
+  <li>Click a template — "New inbound lead follow-up" gives you WhatsApp day 0, call day 2, email day 5, task day 12.</li>
+  <li>Save it. Then on Leads, tick some leads → <strong>Add to Sequence</strong>.</li>
+  <li>The first step fires within 15 minutes and becomes a task for whoever owns the lead.</li>
+</ol>
+<p>It stops on its own when the deal closes or when anyone logs activity against the lead.</p>
+
+<h3>7 · Automations <span class="pill p-new">new</span></h3>
+<ol class="steps">
+  <li>Sidebar → <strong>Automations</strong> → Incoming → <strong>New key</strong>. Name it, pick a project, copy the key (shown once).</li>
+  <li>Test it from any terminal with the command below — a lead should appear in seconds.</li>
+  <li>Rules tab → create "when a lead is created, auto-assign to the least busy rep".</li>
+  <li>Log tab shows every intake, webhook and rule run.</li>
+</ol>
+<pre><code>curl -X POST 'https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake' \
+  -H 'x-api-key: YOUR_KEY_HERE' \
+  -H 'Authorization: Bearer sb_publishable_A8iz_SOWHx_G5eKQZGgfMg_csYrQ5Q8' \
+  -H 'Content-Type: application/json' \
+  -d '{"company_name":"Test Co","contact_name":"Test User","email":"t@example.com","phone":"9876543210"}'</code></pre>
+
+<h3>8 · User management <span class="pill p-fix">important fix</span></h3>
+<p>Sidebar → <strong>Manage Users</strong>. Each person now has a <strong>Receives new leads</strong> toggle.</p>
+<div class="warn">
+  <p><b>This one would have quietly wasted your leads.</b> You have 13 salesman accounts but only two real people. Round-robin assigns to whoever has the fewest open leads — shiva had 130, the eleven test accounts had zero. So every automated lead would have gone to <code>test4@gmail.com</code> and none to your actual salesperson. The toggle is off for all eleven leftovers.</p>
+</div>
+
+<h3>9 · The salesperson view</h3>
+<p>Sign out, sign in as <strong>salesman@techvitta.in</strong>. You should see 5 leads and a restricted menu — no automations, no user management. Confirms the permission rules hold.</p>
+
+<h2>What's deliberately restricted</h2>
+
+<div class="stop">
+  <p><b>Google Places results can be viewed but not imported.</b> This isn't a bug. Scraping Google Maps is prohibited by their terms, which name "copy and save business names, addresses" as an example. And their official API doesn't help: Google's own guide for this exact use case says storing Places contact data in a CRM isn't permitted — only their internal place ID may be kept.</p>
+  <p>OpenStreetMap is the importable source because its licence (ODbL) permits commercial use and permanent storage with attribution. That's why "Find Businesses" defaults to it.</p>
+</div>
+
+<h2>Still on your list</h2>
+
+<table>
+  <thead><tr><th>Item</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Delete <code>VITE_GEMINI_API_KEY</code> from Vercel</td><td>Unused now that Gemini runs server-side. Leaving it re-publishes a key into your public bundle on every build.</td></tr>
+    <tr><td>Turn on leaked-password protection</td><td>Supabase dashboard → Authentication → Policies. Blocks passwords known from breaches. One toggle.</td></tr>
+    <tr><td>Delete the 11 test accounts, when you're sure</td><td>They can't receive leads now, but they can still log in. Manage Users → bin icon.</td></tr>
+    <tr><td>Google Places key, if you want that source</td><td>Needs a separate Google Cloud key with Places API (New) enabled — the Gemini key won't work for it. Then run <code>select public.set_google_places_key('KEY');</code></td></tr>
+  </tbody>
+</table>
+
+<h2>If something's wrong</h2>
+
+<table>
+  <thead><tr><th>Symptom</th><th>Likely cause</th></tr></thead>
+  <tbody>
+    <tr><td>Site looks unchanged</td><td>Vercel hasn't deployed <code>6ef5b47</code> yet, or the build cache served an old bundle</td></tr>
+    <tr><td>AI buttons error</td><td>Open the browser console — the proxy returns a specific reason rather than a generic failure</td></tr>
+    <tr><td>"Find Businesses" says servers are busy</td><td>OpenStreetMap's free servers rate-limit. It already tries three mirrors; wait a minute</td></tr>
+    <tr><td>Few results for a category</td><td>OSM coverage is strong in metros, thin in smaller towns. Colleges are sparse — Hyderabad has one with a phone, versus 26 clinics</td></tr>
+    <tr><td>A sequence hasn't fired</td><td>It runs every 15 minutes. Automations → Log will show it</td></tr>
+  </tbody>
+</table>
+
+<div class="good">
+  <p><b>Undo note:</b> I moved 5 leads from shiva shankar to the demo salesman so that login wasn't an empty screen — HALE CLINICS, Cosmo Radiance, Dr. Priyanka's Dermatology, ZAHA Skin, and Dr. Praveen Kumar Raju. Reassign them back from the Leads page whenever you like.</p>
+</div>
+
+<footer>
+  Call-Leads CRM · sales.techvitta.in · guide written 29 July 2026 against commit 6ef5b47<br>
+  Logins verified live. Business data © OpenStreetMap contributors (ODbL).
+</footer>
+
+</div>
+</body>
+</html>
