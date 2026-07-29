@@ -112,8 +112,12 @@ export interface AIGeneratedLead {
   fit_reason?: string;
   buying_signal?: string;
   estimated_value?: number;
-  /** How sure the model is this is a real, matching company. */
+  /** How sure the model is the COMPANY is real and matches the brief. */
   confidence?: "high" | "medium" | "low";
+  /** The job title to go after, when no specific person is known. */
+  target_role?: string;
+  /** Concrete suggestion for how the rep should find the right person. */
+  research_hint?: string;
   software_category?: string;
   source?: string;
   product_fit?: string;
@@ -199,6 +203,56 @@ export interface GenerateLeadsOptions {
   companySize?: string;
 }
 
+/**
+ * Models are strongly inclined to fill every field, so we verify rather than
+ * trust.
+ */
+function looksFakePhone(v: unknown): boolean {
+  const d = String(v ?? "").replace(/\D/g, "");
+  if (!d) return true;
+  const tail = d.slice(-10);
+  if (tail.length < 10) return true;
+  if (/^(\d)\1+$/.test(tail)) return true;              // 9999999999
+  if (tail.startsWith("98765432")) return true;          // the classic IN placeholder
+  if (tail.startsWith("12345")) return true;
+  if (/^(0000|1111)/.test(tail)) return true;
+  return false;
+}
+
+/**
+ * The individually-plausible-but-collectively-obvious case: a live test
+ * returned 9876543210, ...211, ...212 across consecutive records. Each number
+ * passes a per-record check; the giveaway is only visible across the batch.
+ * If several numbers share a long prefix, treat the whole set as placeholders.
+ */
+function stripSequentialPhones<T extends { phone?: string }>(leads: T[]): T[] {
+  const digits = leads.map((l) => String(l.phone ?? "").replace(/\D/g, "").slice(-10));
+  const byPrefix = new Map<string, number>();
+
+  for (const d of digits) {
+    if (d.length < 10) continue;
+    const prefix = d.slice(0, 8); // first 8 of 10 identical => sequential tail
+    byPrefix.set(prefix, (byPrefix.get(prefix) ?? 0) + 1);
+  }
+
+  const suspect = new Set(
+    [...byPrefix.entries()].filter(([, n]) => n >= 2).map(([p]) => p)
+  );
+  if (suspect.size === 0) return leads;
+
+  return leads.map((l, i) =>
+    suspect.has(digits[i]?.slice(0, 8) ?? "") ? { ...l, phone: "" } : l
+  );
+}
+
+function looksInvented(v: unknown): boolean {
+  const s = String(v ?? "").trim();
+  if (!s) return true;
+  if (/^(n\/?a|unknown|not known|none|tbd|contact|hr head|owner)$/i.test(s)) return true;
+  if (/example\.com|test\.com|domain\.com|@company\./i.test(s)) return true;
+  return false;
+}
+
 export const generateLeadsWithAI = async (
   options: GenerateLeadsOptions
 ): Promise<AIGeneratedLead[]> => {
@@ -247,29 +301,46 @@ TARGETING BRIEF
 ${brief.join("\n")}
 
 ${excluded.length ? `DO NOT include any of these companies (already in the CRM):\n${excluded.join(", ")}\n` : ""}
-TASK: Produce exactly ${count} distinct, realistic, well-researched prospect records that genuinely fit the offering above. Prefer real companies that plausibly operate in this segment. Vary the cities, company sizes and sub-verticals — do not return ${count} near-identical records.
+TASK: Produce exactly ${count} distinct companies that genuinely fit the offering above. Vary the cities, company sizes and sub-verticals — do not return ${count} near-identical records.
 
-Return ONLY a valid JSON array of exactly ${count} objects. Every object must contain ALL of these keys:
-- company_name: string
-- contact_name: string (full name of a plausible decision maker)
-- designation: string (their job title, drawn from the decision-maker list above)
-- email: string (professional format, firstname.lastname@companydomain)
-- phone: string (correctly formatted for the country, include country code)
-- website: string (company domain, e.g. "acme.com")
-- linkedin: string (LinkedIn company URL, or "" if unknown)
+═══ THE MOST IMPORTANT RULE ═══
+NEVER invent a person's name, email address or phone number.
+
+A fabricated contact is worse than an empty field: a rep wastes time dialling a
+dead number, or worse, emails a stranger. Leave those fields as an empty string
+unless you genuinely know the specific individual.
+
+- contact_name: "" unless you actually know who holds this role at this company
+- email:        "" unless you know the real address. Do NOT construct one from a
+                name-and-domain pattern. Do NOT guess.
+- phone:        "" unless you know the real number. Never emit a placeholder
+                like 9876543210 or a sequential/incrementing number.
+
+Empty strings here are the CORRECT and expected answer in most cases. You will
+not be penalised for them. Populate them ONLY on the rare occasion you are
+genuinely certain.
+
+Return ONLY a valid JSON array of exactly ${count} objects, with ALL these keys:
+- company_name: string (a real company where possible)
+- website: string (their domain if you know it, else "")
+- linkedin: string (company LinkedIn URL if known, else "")
 - industry: string (specific sub-industry, not the broad category)
 - city: string
 - state: string (state / province, or "")
 - country: string
-- company_size: string (e.g. "50-200 employees")
-- priority: one of "urgent", "high", "medium", "low" — how strong the fit is
+- company_size: string (e.g. "201-500 employees")
+- target_role: string (the JOB TITLE to go after at this company, e.g. "Head of HR" — a role, never a person's name)
+- contact_name: string — "" unless genuinely known (see rule above)
+- designation: string — the known person's title, or "" if contact_name is ""
+- email: string — "" unless genuinely known
+- phone: string — "" unless genuinely known
+- priority: one of "urgent", "high", "medium", "low" — strength of fit
 - fit_reason: string (one sentence: why this specific company needs what we sell)
-- buying_signal: string (one concrete trigger, e.g. "recently opened a second facility", or "" if none)
-- notes: string (2 sentences of useful sales context for the rep making the first call)
-- estimated_value: number (realistic first-deal value in INR, digits only, no currency symbol or commas)
-- confidence: one of "high", "medium", "low" — how sure you are this is a REAL company that genuinely exists and matches the brief. Use "high" only for companies you actually recognise. Use "low" when the contact name, email or phone is a plausible guess rather than something you know. Be honest here; the sales rep uses this to decide what to verify before calling.
-
-IMPORTANT: do not silently invent precision. If you don't know a real contact person, still return a plausible one but mark confidence "low" so it gets verified.
+- buying_signal: string (one concrete trigger, or "" if you know of none — do not invent one)
+- notes: string (2 sentences of useful context for the rep)
+- estimated_value: number (realistic first-deal value in INR, digits only)
+- confidence: one of "high", "medium", "low" — how sure you are this COMPANY is real and matches the brief. This is about the company, not the contact.
+- research_hint: string (one concrete sentence on how the rep should find the right person, e.g. "Search LinkedIn for 'HR Head' at this company, or call the main line and ask for the HR department")
 
 JSON array only. Start with [ and end with ].`;
 
@@ -278,7 +349,7 @@ JSON array only. Start with [ and end with ].`;
 
   const seen = new Set<string>();
 
-  return leads
+  const cleaned = leads
     .filter((l: any) => l && l.company_name)
     .filter((l: any) => {
       const key = String(l.company_name).trim().toLowerCase();
@@ -299,7 +370,21 @@ JSON array only. Start with [ and end with ].`;
       confidence: (["high", "medium", "low"].includes(lead.confidence)
         ? lead.confidence
         : "medium") as AIGeneratedLead["confidence"],
+      // Belt and braces: strip anything that looks like a fabricated contact
+      // even if the model ignores the instruction.
+      contact_name: looksInvented(lead.contact_name) ? "" : String(lead.contact_name ?? "").trim(),
+      email: looksInvented(lead.email) ? "" : String(lead.email ?? "").trim(),
+      phone: looksFakePhone(lead.phone) ? "" : String(lead.phone ?? "").trim(),
+      // A designation only means something if we know who holds it.
+      designation: looksInvented(lead.contact_name)
+        ? ""
+        : String(lead.designation ?? "").trim(),
+      target_role: String(lead.target_role ?? lead.designation ?? "").trim(),
+      research_hint: String(lead.research_hint ?? "").trim(),
       source: "AI Generated",
       product_fit: lead.fit_reason || lead.product_fit || "",
     }));
+
+  // Sequential placeholders are only detectable across the whole batch.
+  return stripSequentialPhones(cleaned);
 };

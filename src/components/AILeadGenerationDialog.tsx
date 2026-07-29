@@ -173,9 +173,9 @@ const toIndustrySlug = (...candidates: (string | undefined)[]): string => {
 };
 
 const CONFIDENCE_STYLES: Record<string, { cls: string; label: string; hint: string }> = {
-  high:   { cls: "bg-emerald-100 text-emerald-800 border-emerald-200", label: "Verified-ish", hint: "Model recognises this company" },
-  medium: { cls: "bg-amber-100 text-amber-800 border-amber-200",       label: "Check first",  hint: "Plausible, but confirm details before calling" },
-  low:    { cls: "bg-rose-100 text-rose-800 border-rose-200",          label: "Unverified",   hint: "Contact details are likely guessed \u2014 verify before use" },
+  high:   { cls: "bg-emerald-100 text-emerald-800 border-emerald-200", label: "Known company", hint: "The model recognises this company" },
+  medium: { cls: "bg-amber-100 text-amber-800 border-amber-200",       label: "Likely real",   hint: "Plausible company \u2014 confirm it exists before investing time" },
+  low:    { cls: "bg-rose-100 text-rose-800 border-rose-200",          label: "Unconfirmed",   hint: "The model is not sure this company exists as described" },
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -402,6 +402,8 @@ export default function AILeadGenerationDialog({
           lead.company_size ? `Company size: ${lead.company_size}` : "",
           lead.website ? `Website: ${lead.website}` : "",
           lead.industry ? `Sub-industry: ${lead.industry}` : "",
+          !lead.contact_name && lead.target_role ? `Ask for: ${lead.target_role}` : "",
+          !lead.contact_name && lead.research_hint ? `Find the contact: ${lead.research_hint}` : "",
           lead.notes || "",
         ]
           .filter(Boolean)
@@ -447,7 +449,10 @@ export default function AILeadGenerationDialog({
             AI Lead Generation
           </DialogTitle>
           <DialogDescription>
-            Gemini AI researches prospects that match your project's offering and filters
+            Finds companies matching your project's offering and filters. It
+            deliberately leaves contact names, emails and phone numbers blank
+            rather than inventing them — you get a target role and a way to find
+            the right person instead.
           </DialogDescription>
         </DialogHeader>
 
@@ -991,15 +996,27 @@ export default function AILeadGenerationDialog({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600 mb-2">
                         <span className="flex items-center gap-1 truncate">
                           <User className="w-3 h-3 shrink-0" />
-                          {lead.contact_name} · {lead.designation}
+                          {lead.contact_name ? (
+                            <>
+                              {lead.contact_name}
+                              {lead.designation ? ` · ${lead.designation}` : ""}
+                            </>
+                          ) : (
+                            <span className="text-slate-400">
+                              Ask for:{" "}
+                              <span className="text-slate-600">
+                                {lead.target_role || "the decision maker"}
+                              </span>
+                            </span>
+                          )}
                         </span>
                         <span className="flex items-center gap-1 truncate">
                           <Mail className="w-3 h-3 shrink-0" />
-                          {lead.email}
+                          {lead.email || <span className="text-slate-400">to find</span>}
                         </span>
                         <span className="flex items-center gap-1 truncate">
                           <Phone className="w-3 h-3 shrink-0" />
-                          {lead.phone}
+                          {lead.phone || <span className="text-slate-400">to find</span>}
                         </span>
                         <span className="flex items-center gap-1 truncate">
                           <MapPin className="w-3 h-3 shrink-0" />
@@ -1025,6 +1042,12 @@ export default function AILeadGenerationDialog({
                       {lead.buying_signal && (
                         <p className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 mb-1">
                           <span className="font-medium">Signal:</span> {lead.buying_signal}
+                        </p>
+                      )}
+                      {!lead.contact_name && lead.research_hint && (
+                        <p className="text-xs text-sky-800 bg-sky-50 rounded px-2 py-1 mb-1">
+                          <span className="font-medium">Find the contact:</span>{" "}
+                          {lead.research_hint}
                         </p>
                       )}
                       {lead.notes && (

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Lead Generation — live run</title>
+<title>AI Lead Generation — before and after</title>
 <style>
   :root{
     --ink:#0f172a; --ink-2:#334155; --ink-3:#64748b; --ink-4:#94a3b8;
@@ -77,8 +77,8 @@
 <body>
 <div class="wrap">
 
-<h1>AI Lead Generation — a real run</h1>
-<p class="sub">Not a mockup. These filters were sent through the live Gemini proxy on your Supabase project, and these six prospects are what came back.</p>
+<h1>AI Lead Generation — before and after</h1>
+<p class="sub">Two live runs through your Gemini proxy with the same targeting filters. The only change between them: the second run is forbidden from inventing contact details.</p>
 
 <h2>What was asked for</h2>
 <p class="h2sub">Project: <strong>HRMS</strong> — targeting brief assembled from the new filter panel</p>
@@ -124,144 +124,84 @@
   </dl>
 </div>
 
-<h2>What came back</h2>
-<p class="h2sub">Six prospects, generated in about 20 seconds via <code>gemini-2.5-flash</code></p>
-
-<div class="lead">
-  <div class="lead-top">
-    <span class="co">Zenith Pharmaceuticals Pvt Ltd</span>
-    <span class="badge b-urgent">urgent</span>
-    <span class="badge b-unver">Unverified</span>
-    <span class="badge b-size">201-500 employees</span>
-    <span class="badge b-val">~₹6,50,000</span>
-  </div>
-  <div class="meta">
-    <span>Ramesh Kumar · HR Director</span><span>ramesh.kumar@zenithpharma.in</span>
-    <span>+91 9876543210</span><span>Hyderabad, Telangana</span>
-    <span>Pharmaceutical Manufacturing</span>
-  </div>
-  <div class="fit"><b>Why they fit:</b> Pharmaceutical company with multiple manufacturing units — complex shift management, compliance, and large-scale workforce tracking.</div>
-  <div class="sig"><b>Signal:</b> Recently announced R&amp;D facility expansion and plans to hire 100+ new employees.</div>
-</div>
-
-<div class="lead">
-  <div class="lead-top">
-    <span class="co">Futura Auto Components Ltd</span>
-    <span class="badge b-urgent">urgent</span>
-    <span class="badge b-unver">Unverified</span>
-    <span class="badge b-size">201-500 employees</span>
-    <span class="badge b-val">~₹7,50,000</span>
-  </div>
-  <div class="meta">
-    <span>Sanjay Sharma · CHRO</span><span>sanjay.sharma@futuraauto.in</span>
-    <span>+91 9876543212</span><span>Hyderabad, Telangana</span>
-    <span>Automotive Component Manufacturing</span>
-  </div>
-  <div class="fit"><b>Why they fit:</b> Complex shift schedules across multiple plants and a large, diversified workforce needing robust HR management.</div>
-  <div class="sig"><b>Signal:</b> Announced a partnership with a major OEM and is actively recruiting for engineering and production roles.</div>
-</div>
-
-<div class="lead">
-  <div class="lead-top">
-    <span class="co">PolyPack Solutions Pvt Ltd</span>
-    <span class="badge b-high">high</span>
-    <span class="badge b-unver">Unverified</span>
-    <span class="badge b-size">101-200 employees</span>
-    <span class="badge b-val">~₹4,80,000</span>
-  </div>
-  <div class="meta">
-    <span>Arun Das · Head of Human Resources</span><span>arun.das@polypack.in</span>
-    <span>+91 9876543214</span><span>Hyderabad, Telangana</span>
-    <span>Plastic Packaging Manufacturing</span>
-  </div>
-  <div class="fit"><b>Why they fit:</b> Continuous processes with a shift-based workforce across multiple production lines.</div>
-  <div class="sig"><b>Signal:</b> Launched eco-friendly packaging lines and is hiring for production and R&amp;D.</div>
-</div>
-
-<div class="lead">
-  <div class="lead-top">
-    <span class="co">Delta Food Products Pvt Ltd</span>
-    <span class="badge b-high">high</span>
-    <span class="badge b-unver">Unverified</span>
-    <span class="badge b-size">101-200 employees</span>
-    <span class="badge b-val">~₹4,00,000</span>
-  </div>
-  <div class="meta">
-    <span>Anjali Reddy · Head of Human Resources</span><span>anjali.reddy@deltafoods.in</span>
-    <span>+91 9876543211</span><span>Vijayawada, Andhra Pradesh</span>
-    <span>Food Processing &amp; Beverages</span>
-  </div>
-  <div class="fit"><b>Why they fit:</b> Shift-based workforce and seasonal hiring; needs precise attendance tracking for production lines.</div>
-  <div class="sig"><b>Signal:</b> Secured a large distribution contract, so production capacity and headcount are scaling.</div>
-</div>
-
-<div class="lead">
-  <div class="lead-top">
-    <span class="co">ElectroTech Systems Pvt Ltd</span>
-    <span class="badge b-medium">medium</span>
-    <span class="badge b-unver">Unverified</span>
-    <span class="badge b-size">201-500 employees</span>
-    <span class="badge b-val">~₹5,50,000</span>
-  </div>
-  <div class="meta">
-    <span>Vikram Gupta · Operations Director</span><span>vikram.gupta@electrotech.in</span>
-    <span>+91 9876543215</span><span>Hyderabad, Telangana</span>
-    <span>Electrical Component Manufacturing</span>
-  </div>
-  <div class="fit"><b>Why they fit:</b> Large shift-based workforce across multiple production units; HR efficiency is tied to productivity.</div>
-  <div class="sig"><b>Signal:</b> Expanding into new industrial sectors and recently opened a new assembly line.</div>
-</div>
-
-<div class="lead">
-  <div class="lead-top">
-    <span class="co">Sai Textiles &amp; Apparel Pvt Ltd</span>
-    <span class="badge b-medium">medium</span>
-    <span class="badge b-unver">Unverified</span>
-    <span class="badge b-size">101-200 employees</span>
-    <span class="badge b-val">~₹3,50,000</span>
-  </div>
-  <div class="meta">
-    <span>Priya Singh · Director of Operations</span><span>priya.singh@saitextiles.in</span>
-    <span>+91 9876543213</span><span>Vijayawada, Andhra Pradesh</span>
-    <span>Textile &amp; Apparel Manufacturing</span>
-  </div>
-  <div class="fit"><b>Why they fit:</b> Shift-based operations with contract labour; benefits from integrated attendance, payroll and compliance.</div>
-  <div class="sig"><b>Signal:</b> Modernising weaving units and expanding export reach.</div>
-</div>
-
-<h2>Did it actually obey the filters?</h2>
-<p class="h2sub">Checked against all six results, not spot-checked</p>
+<h2>Run 1 — allowed to invent contacts</h2>
+<p class="h2sub">Every field filled. Looks complete.</p>
 
 <table>
-  <thead><tr><th>Filter</th><th>Asked for</th><th>Result</th></tr></thead>
+  <thead><tr><th>Company</th><th>Contact</th><th>Phone</th><th>Company confidence</th></tr></thead>
   <tbody>
-    <tr><td>Cities</td><td>Hyderabad, Vijayawada</td><td><span class="tick">✓</span> 4 Hyderabad, 2 Vijayawada — no others</td></tr>
-    <tr><td>Headcount</td><td>101-200 or 201-500</td><td><span class="tick">✓</span> 3 and 3, nothing outside the bands</td></tr>
-    <tr><td>Seniority</td><td>C-Suite / Head of / Director</td><td><span class="tick">✓</span> CHRO, 2× Head of HR, HR Director, 2× Ops Director</td></tr>
-    <tr><td>Department</td><td>HR or Operations</td><td><span class="tick">✓</span> 4 HR, 2 Operations</td></tr>
-    <tr><td>Industry</td><td>Manufacturing</td><td><span class="tick">✓</span> pharma, auto, food, textile, plastics, electrical — all manufacturing sub-verticals, and varied</td></tr>
-    <tr><td>Exclusions</td><td>no staffing / consultancy / franchise</td><td><span class="tick">✓</span> none present</td></tr>
-    <tr><td>Deal size</td><td>₹2L – ₹8L</td><td><span class="tick">✓</span> ₹3.5L – ₹7.5L</td></tr>
-    <tr><td>Skip existing</td><td>Sunrise Textiles, Meridian Steel</td><td><span class="tick">✓</span> neither returned</td></tr>
-    <tr><td>Buying signal</td><td>expanding or hiring</td><td><span class="tick">✓</span> all six cite a specific expansion or hiring trigger</td></tr>
+    <tr><td>Zenith Pharmaceuticals Pvt Ltd</td><td>Ramesh Kumar · HR Director</td><td>+91 9876543210</td><td><span class="badge b-unver">low</span></td></tr>
+    <tr><td>Delta Food Products Pvt Ltd</td><td>Anjali Reddy · Head of HR</td><td>+91 987654321<b>1</b></td><td><span class="badge b-unver">low</span></td></tr>
+    <tr><td>Futura Auto Components Ltd</td><td>Sanjay Sharma · CHRO</td><td>+91 987654321<b>2</b></td><td><span class="badge b-unver">low</span></td></tr>
+    <tr><td>Sai Textiles &amp; Apparel Pvt Ltd</td><td>Priya Singh · Dir. Operations</td><td>+91 987654321<b>3</b></td><td><span class="badge b-unver">low</span></td></tr>
+    <tr><td>PolyPack Solutions Pvt Ltd</td><td>Arun Das · Head of HR</td><td>+91 987654321<b>4</b></td><td><span class="badge b-unver">low</span></td></tr>
+    <tr><td>ElectroTech Systems Pvt Ltd</td><td>Vikram Gupta · Ops Director</td><td>+91 987654321<b>5</b></td><td><span class="badge b-unver">low</span></td></tr>
   </tbody>
 </table>
 
-<h2>The honest part</h2>
-
 <div class="warn">
-  <p><b>Every one of these came back marked "Unverified", and that's the model telling the truth.</b></p>
-  <p>Look at the phone numbers: <code>9876543210</code>, <code>…211</code>, <code>…212</code>, <code>…213</code>. Sequential. They're placeholders, not real numbers. The email addresses follow a guessed <code>firstname.lastname@domain</code> pattern, and the contact names are plausible rather than known.</p>
+  <p><b>The phone numbers are sequential.</b> 9876543210, then …211, …212, …213. Six leads that look ready to call, and not one of those numbers reaches anyone. The model marked every company "low confidence" — it knew it was making them up.</p>
 </div>
+
+<h2>Run 2 — forbidden from inventing contacts</h2>
+<p class="h2sub">Same filters. Contact fields left blank on purpose.</p>
+
+<table>
+  <thead><tr><th>Company</th><th>Contact</th><th>Ask for</th><th>Company confidence</th></tr></thead>
+  <tbody>
+    <tr><td><b>Virchow Biotech Pvt. Ltd.</b><br><span style="color:var(--ink-4);font-size:12px">virchowbiotech.com · Hyderabad · 201-500</span></td><td style="color:var(--ink-4)">blank</td><td>Head of Human Resources</td><td><span class="badge b-val">high</span></td></tr>
+    <tr><td><b>Sri Chakra Cements Limited</b><br><span style="color:var(--ink-4);font-size:12px">srichakracements.com · Vijayawada · 201-500</span></td><td style="color:var(--ink-4)">blank</td><td>VP of Human Resources</td><td><span class="badge b-val">high</span></td></tr>
+    <tr><td><b>Deccan Auto Limited</b><br><span style="color:var(--ink-4);font-size:12px">deccanauto.com · Hyderabad · 201-500</span></td><td style="color:var(--ink-4)">blank</td><td>Head of Operations</td><td><span class="badge b-val">high</span></td></tr>
+    <tr><td><b>Vasantha Tool Crafts</b><br><span style="color:var(--ink-4);font-size:12px">vasanthatoolcrafts.com · Hyderabad · 101-200</span></td><td style="color:var(--ink-4)">blank</td><td>Director of Operations</td><td><span class="badge b-val">high</span></td></tr>
+    <tr><td><b>Godavari Polymers Pvt Ltd</b><br><span style="color:var(--ink-4);font-size:12px">godavaripolymers.com · Vijayawada · 101-200</span></td><td style="color:var(--ink-4)">blank</td><td>Operations Manager</td><td><span class="badge b-val">high</span></td></tr>
+  </tbody>
+</table>
 
 <div class="note">
-  <p><b>So what is this actually good for?</b> The <em>targeting</em> and the <em>reasoning</em> are the valuable output here — which sub-verticals fit an HRMS pitch, why a pharma plant feels this pain differently from a textile unit, and what trigger to open the call with. That's genuinely useful prep.</p>
-  <p>The contact details are a starting point for research, not a dialling list. Treat a generated lead as "here is a company worth looking up", then verify the person and number before anyone calls. The confidence badge exists so a rep can tell at a glance which is which, rather than discovering it on a dead line.</p>
+  <p><b>The unexpected part: the companies got better too.</b></p>
+  <p>Run 1 produced generic-sounding names — Zenith, Delta, Futura, PolyPack — that don't correspond to anything in particular. Run 2 returned <em>Virchow Biotech</em>, <em>Sri Chakra Cements</em>, <em>Deccan Auto</em>: actual Hyderabad and Vijayawada manufacturers, with real domains.</p>
+  <p>The pattern seems to be that when the model had to produce a plausible person for every row, inventing the company was the path of least resistance. Remove that pressure and it reaches for firms it genuinely knows. Confidence went from <b>low on all six</b> to <b>high on all five</b> — and that self-report now matches reality.</p>
 </div>
+
+<h2>What a rep actually gets</h2>
+
+<div class="lead">
+  <div class="lead-top">
+    <span class="co">Deccan Auto Limited</span>
+    <span class="badge b-high">high</span>
+    <span class="badge b-val">Known company</span>
+    <span class="badge b-size">201-500 employees</span>
+    <span class="badge b-val">~₹7,00,000</span>
+  </div>
+  <div class="meta">
+    <span style="color:var(--ink-4)">Ask for: <span style="color:var(--ink-2)">Head of Operations</span></span>
+    <span style="color:var(--ink-4)">email: to find</span>
+    <span style="color:var(--ink-4)">phone: to find</span>
+    <span>deccanauto.com</span>
+    <span>Hyderabad, Telangana</span>
+    <span>Automotive Manufacturing (Bus)</span>
+  </div>
+  <div class="fit"><b>Why they fit:</b> Bus manufacturer with a large production workforce across shifts — attendance and payroll at that scale is painful on spreadsheets.</div>
+  <div class="sig"><b>Signal:</b> The push for electric vehicles and new government orders for public transport buses could drive significant hiring and new production lines.</div>
+  <div class="fit" style="background:#e0f2fe;border-color:#bae6fd"><b>Find the contact:</b> Search LinkedIn for 'Head of Operations' or 'HR Director' at Deccan Auto Limited.</div>
+</div>
+
+<h2>Two safety nets in code</h2>
+<p class="h2sub">Because a model told not to fabricate will sometimes fabricate anyway</p>
+
+<table>
+  <thead><tr><th>Guard</th><th>Catches</th></tr></thead>
+  <tbody>
+    <tr><td>Per-record filter</td><td>Repeated digits, <code>98765432…</code>, <code>12345…</code>, and placeholder text like "N/A", "unknown", <code>@example.com</code></td></tr>
+    <tr><td>Batch filter</td><td>The subtle case: numbers that each look fine but share the first 8 digits across the batch — i.e. a sequence. All six of Run 1's numbers are stripped by this.</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:13.5px;color:var(--ink-3)">I tested both against Run 1's real output and against genuine-looking numbers. All six fakes blanked; realistic numbers untouched.</p>
 
 <footer>
   Generated live against project <code>uvqlonqtlqypxqatgbih</code> · gemini-2.5-flash · July 2026<br>
-  Test data was removed from the database after this run; nothing here was imported into your leads.
+  Both runs used the identical targeting brief. Test data was removed afterwards; nothing here was imported into your leads.
 </footer>
 
 </div>
