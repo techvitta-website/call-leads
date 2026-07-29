@@ -116,20 +116,10 @@
 
 <h2>1 · One-time setup</h2>
 
-<p>Two things need doing before anything can reach the CRM.</p>
+<p>One thing needs doing before anything can reach the CRM: generate an API key.</p>
 
-<h3>Turn off JWT verification on the intake endpoint</h3>
-
-<p>Supabase defaults to requiring one of its own auth tokens on every edge function. Your intake endpoint has its own authentication — the API key you generate below — so this default just gets in the way of external services calling it.</p>
-
-<ol class="steps">
-  <li>Open the <a href="https://supabase.com/dashboard/project/uvqlonqtlqypxqatgbih/functions">Supabase dashboard → Edge Functions</a>.</li>
-  <li>Click <strong>lead-intake</strong>, then its <strong>Settings</strong> tab.</li>
-  <li>Turn <strong>Verify JWT with legacy secret</strong> <em>off</em>. Save.</li>
-</ol>
-
-<div class="note">
-  <p><strong>Is that safe?</strong> Yes. Requests still have to present a valid <code>x-api-key</code>, which is stored only as a SHA-256 hash — the plaintext key exists nowhere in the database. Turning JWT off just stops Supabase demanding a <em>second</em>, unrelated credential on top of yours.</p>
+<div class="good">
+  <p><strong>No Supabase dashboard changes are needed.</strong> An earlier version of this guide asked you to turn off "Verify JWT" on the edge function. That turned out to be unnecessary — sending the project's <em>publishable</em> key in the <code>Authorization</code> header satisfies Supabase's gateway, and the supplied n8n workflows already do this. The publishable key is public by design; it identifies the project and grants nothing on its own. Real authentication is your <code>x-api-key</code>.</p>
 </div>
 
 <h3>Create your first API key</h3>
@@ -148,13 +138,15 @@
 <pre><code>POST https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake
 
 Headers:
-  x-api-key: tvk_live_xxxxxxxxxxxxxxxxxxxx
-  Content-Type: application/json</code></pre>
+  x-api-key:     tvk_live_xxxxxxxxxxxxxxxxxxxx
+  Authorization: Bearer sb_publishable_A8iz_SOWHx_G5eKQZGgfMg_csYrQ5Q8
+  Content-Type:  application/json</code></pre>
 
 <p>Test it from any terminal:</p>
 
 <pre><code>curl -X POST 'https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake' \
   -H 'x-api-key: YOUR_KEY_HERE' \
+  -H 'Authorization: Bearer sb_publishable_A8iz_SOWHx_G5eKQZGgfMg_csYrQ5Q8' \
   -H 'Content-Type: application/json' \
   -d '{"company_name":"Test Co","contact_name":"Test User","email":"test@example.com","phone":"9876543210"}'</code></pre>
 
@@ -305,7 +297,7 @@ Headers:
   <thead><tr><th>Symptom</th><th>Usually means</th></tr></thead>
   <tbody>
     <tr><td><code>401 Invalid or inactive API key</code></td><td>Key mistyped, or toggled off on the Incoming tab</td></tr>
-    <tr><td>A 401 you can't explain, with a correct key</td><td>JWT verification is still on — see section 1</td></tr>
+    <tr><td><code>Missing authorization header</code></td><td>The <code>Authorization: Bearer sb_publishable_…</code> header is absent — see section 1</td></tr>
     <tr><td><code>No email or phone found in payload</code></td><td>The form isn't collecting one, or uses an unusual field name</td></tr>
     <tr><td><code>No project_id …</code></td><td>The API key has no project set; edit it or send <code>project_id</code> in the body</td></tr>
     <tr><td>Leads land but aren't assigned</td><td>Assignment mode is "leave unassigned", or no users have the salesman role</td></tr>

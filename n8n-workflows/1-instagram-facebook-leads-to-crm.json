@@ -6,7 +6,10 @@
       "name": "New Lead Ad Submission",
       "type": "n8n-nodes-base.facebookLeadAdsTrigger",
       "typeVersion": 1,
-      "position": [-160, 0],
+      "position": [
+        -160,
+        0
+      ],
       "webhookId": "a1c7e9d3-4b52-4f80-91a6-0e3d5c8b7a24",
       "parameters": {
         "event": "newLead",
@@ -31,7 +34,10 @@
       "name": "Send to CRM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
-      "position": [120, 0],
+      "position": [
+        120,
+        0
+      ],
       "parameters": {
         "method": "POST",
         "url": "https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake",
@@ -42,6 +48,10 @@
             {
               "name": "x-api-key",
               "value": "PASTE_YOUR_INSTAGRAM_API_KEY_HERE"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_A8iz_SOWHx_G5eKQZGgfMg_csYrQ5Q8"
             }
           ]
         },
@@ -51,7 +61,7 @@
         "jsonBody": "={{ JSON.stringify($json) }}",
         "options": {}
       },
-      "notes": "Replace the x-api-key value with the key you generated in the CRM under Automations → Incoming. The CRM parses Meta's field format natively, so the whole payload is passed straight through with no mapping."
+      "notes": "Replace the x-api-key value with the key you generated in the CRM under Automations → Incoming. The CRM parses Meta's field format natively, so the whole payload is passed straight through with no mapping. The Authorization header carries the project publishable key, which is public by design — it only satisfies the Supabase gateway. Real authentication is the x-api-key."
     }
   ],
   "connections": {

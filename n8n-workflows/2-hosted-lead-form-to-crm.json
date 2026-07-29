@@ -6,7 +6,10 @@
       "name": "Lead Form",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.6,
-      "position": [-260, 0],
+      "position": [
+        -260,
+        0
+      ],
       "webhookId": "c2f8e1a4-6b90-4d37-8e52-9a0b1c3d5e7f",
       "parameters": {
         "path": "enquiry",
@@ -62,7 +65,10 @@
       "name": "Map to CRM Fields",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
-      "position": [-20, 0],
+      "position": [
+        -20,
+        0
+      ],
       "parameters": {
         "mode": "manual",
         "assignments": {
@@ -126,7 +132,10 @@
       "name": "Send to CRM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "parameters": {
         "method": "POST",
         "url": "https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake",
@@ -137,6 +146,10 @@
             {
               "name": "x-api-key",
               "value": "PASTE_YOUR_WEBSITE_FORM_API_KEY_HERE"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_A8iz_SOWHx_G5eKQZGgfMg_csYrQ5Q8"
             }
           ]
         },
@@ -145,7 +158,8 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json) }}",
         "options": {}
-      }
+      },
+      "notes": "The Authorization header carries the project publishable key, which is public by design — it only satisfies the Supabase gateway. Real authentication is the x-api-key."
     }
   ],
   "connections": {

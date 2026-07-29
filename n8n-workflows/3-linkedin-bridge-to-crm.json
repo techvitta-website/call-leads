@@ -6,7 +6,10 @@
       "name": "Receive Lead",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [-260, 0],
+      "position": [
+        -260,
+        0
+      ],
       "webhookId": "d3a9f2b5-8c17-4e60-9b43-2f5a7c9e1d04",
       "parameters": {
         "httpMethod": "POST",
@@ -21,7 +24,10 @@
       "name": "Normalise Fields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-20, 0],
+      "position": [
+        -20,
+        0
+      ],
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
@@ -33,7 +39,10 @@
       "name": "Has Contact Details?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -65,7 +74,10 @@
       "name": "Send to CRM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
-      "position": [480, -100],
+      "position": [
+        480,
+        -100
+      ],
       "parameters": {
         "method": "POST",
         "url": "https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake",
@@ -76,6 +88,10 @@
             {
               "name": "x-api-key",
               "value": "PASTE_YOUR_LINKEDIN_API_KEY_HERE"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_A8iz_SOWHx_G5eKQZGgfMg_csYrQ5Q8"
             }
           ]
         },
@@ -84,7 +100,8 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json) }}",
         "options": {}
-      }
+      },
+      "notes": "The Authorization header carries the project publishable key, which is public by design — it only satisfies the Supabase gateway. Real authentication is the x-api-key."
     }
   ],
   "connections": {

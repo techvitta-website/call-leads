@@ -38,9 +38,12 @@ Worth doing if your n8n is reachable from the public internet. Skip it if you're
 ```bash
 curl -X POST 'https://uvqlonqtlqypxqatgbih.supabase.co/functions/v1/lead-intake' \
   -H 'x-api-key: YOUR_KEY_HERE' \
+  -H 'Authorization: Bearer sb_publishable_A8iz_SOWHx_G5eKQZGgfMg_csYrQ5Q8' \
   -H 'Content-Type: application/json' \
   -d '{"company_name":"Test Co","contact_name":"Test User","email":"test@example.com","phone":"9876543210"}'
 ```
+
+The `Authorization` header carries the project's **publishable** key, which is public by design — it only satisfies Supabase's gateway. Your real credential is the `x-api-key`. No Supabase dashboard changes are needed.
 
 Expect `{"ok": true, "created": 1, ...}`. Then check **Automations → Log** in the CRM.
 
