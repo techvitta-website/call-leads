@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Users &amp; Access — sales.techvitta.in</title>
+<style>
+  :root {
+    --ink: #0f172a; --ink2: #334155; --muted: #64748b;
+    --line: #e2e8f0; --surface: #ffffff; --bg: #f8fafc;
+    --accent: #047857; --warn: #b45309; --warnbg: #fffbeb; --danger: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink2);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 40px 22px 80px; }
+  header { border-bottom: 3px solid var(--accent); padding-bottom: 18px; margin-bottom: 34px; }
+  h1 { color: var(--ink); font-size: 30px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  header p { margin: 0; color: var(--muted); }
+  h2 {
+    color: var(--ink); font-size: 20px; margin: 42px 0 14px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+  h3 { color: var(--ink); font-size: 16px; margin: 26px 0 8px; }
+  p { margin: 0 0 14px; }
+  code {
+    background: #eef2f7; padding: 2px 6px; border-radius: 4px;
+    font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink);
+  }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink); font-weight: 600; background: #f1f5f9; font-size: 14px; }
+  td:first-child { white-space: nowrap; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 20px 22px; margin: 18px 0;
+  }
+  .note {
+    background: var(--warnbg); border: 1px solid #fde68a;
+    border-left: 4px solid var(--warn); border-radius: 8px;
+    padding: 16px 20px; margin: 20px 0;
+  }
+  .note strong { color: var(--warn); }
+  .path {
+    display: inline-block; background: #ecfdf5; border: 1px solid #a7f3d0;
+    color: var(--accent); border-radius: 6px; padding: 3px 10px;
+    font: 14px ui-monospace, Menlo, monospace;
+  }
+  .yes { color: var(--accent); font-weight: 600; }
+  .no  { color: var(--danger); }
+  footer { margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Users &amp; Access</h1>
+  <p>Managing logins, roles and passwords on sales.techvitta.in</p>
+</header>
+
+<p>
+  You can now add people, change what they're allowed to see, reset a forgotten
+  password and switch a login off — all from inside the CRM, without opening the
+  Supabase dashboard. Sign in as <code>venkatesh@techvitta.in</code> and open
+  <span class="path">Users &amp; Access</span> in the sidebar.
+</p>
+
+<h2>What each role can do</h2>
+
+<table>
+  <thead>
+    <tr><th>Role</th><th>Sees</th><th>Can manage people?</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Owner</strong></td>
+      <td>Everything.</td>
+      <td class="yes">Everything, on anyone — roles included.</td>
+    </tr>
+    <tr>
+      <td><strong>Manager</strong></td>
+      <td>All leads, projects, automations and the AI tools.</td>
+      <td>Add salespeople, reset their passwords, switch their logins off.
+          <span class="no">Cannot change anyone's role</span>, and cannot touch
+          another manager or an owner.</td>
+    </tr>
+    <tr>
+      <td><strong>Salesperson</strong></td>
+      <td>Only the leads assigned to them.</td>
+      <td class="no">Nothing. The page isn't reachable for them at all.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  Role assignment being owner-only is deliberate. If a manager could grant the
+  manager role, any one of them could quietly mint peers and the owner tier
+  would stop meaning anything.
+</p>
+
+<h2>The things you'll actually do</h2>
+
+<h3>Reset someone's password</h3>
+<p>
+  Find them in the list, press <strong>Reset password</strong>. A strong password
+  is suggested — press the copy button, save it, then press <strong>Set
+  password</strong>. It takes effect immediately and signs them out everywhere
+  else. Send it to them over something private and ask them to change it.
+</p>
+<p>
+  There's no "email them a reset link" flow here; this is a deliberate hand-off
+  so you always know the account is back in the right hands.
+</p>
+
+<h3>Stop someone signing in</h3>
+<p>
+  Switch off <strong>Can sign in</strong>. This is the right move when someone
+  leaves — their leads, calls and history all stay exactly where they are, and
+  you can switch it straight back on. Deleting is permanent and asks you to hand
+  their leads to someone else first.
+</p>
+
+<h3>Take someone out of the lead rotation</h3>
+<p>
+  Each salesperson has a <strong>Gets new leads</strong> switch. New leads from
+  the website, Instagram, LinkedIn and the AI tools are handed to whoever has the
+  fewest open leads — which means a dormant account sitting at zero absorbs
+  everything. Switch it off for anyone who shouldn't be receiving work. Leads
+  they already hold aren't affected.
+</p>
+
+<h3>Add a person</h3>
+<p>
+  <strong>Add person</strong>, fill in name and email, pick the role, copy the
+  suggested password. They can sign in straight away — no confirmation email.
+</p>
+
+<h2>Guards that will stop you</h2>
+
+<p>These refuse rather than let you break something:</p>
+
+<table>
+  <tbody>
+    <tr><td>Demoting yourself</td><td>Locked in the UI. It would take away this page and need another owner to undo.</td></tr>
+    <tr><td>Suspending or deleting yourself</td><td>Refused.</td></tr>
+    <tr><td>Demoting the last owner who can sign in</td><td>Refused. Promote someone else to owner first.</td></tr>
+    <tr><td>Deleting someone who holds leads</td><td>Refused until you pick who inherits them.</td></tr>
+    <tr><td>A manager changing any role</td><td>Refused.</td></tr>
+    <tr><td>A manager touching another manager or an owner</td><td>Refused.</td></tr>
+  </tbody>
+</table>
+
+<p>
+  Every one of these is enforced on the server, not just hidden in the interface,
+  and your role is re-read from the database on every single request — so a
+  browser session opened before a demotion carries no leftover authority.
+</p>
+
+<h2>Two things worth cleaning up</h2>
+
+<div class="note">
+  <p><strong>Nine accounts in your list can't actually sign in.</strong></p>
+  <p>
+    <code>owner@salesflow.com</code>, <code>manager@salesflow.com</code>,
+    <code>salesman@salesflow.com</code>, <code>new@gmail.com</code>,
+    <code>sreenu@gmail.com</code>, <code>test1@gmail.com</code>,
+    <code>test6@gmail.com</code>, <code>q@gmail.com</code> and
+    <code>Venky@gmail.com</code> are leftover records with no login attached.
+    They're now marked <em>"No login — leftover record"</em> so they stop reading
+    as working accounts. Safe to delete once you've confirmed none of them holds
+    leads you care about.
+  </p>
+  <p>
+    <code>owner@salesflow.com</code> mattered more than the rest: it was counted
+    as a second owner, which meant the system would have let you demote your own
+    account and leave nobody able to reach this page. That's now fixed — only
+    owners who can genuinely sign in are counted.
+  </p>
+</div>
+
+<div class="note">
+  <p><strong>Two logins exist that belong to nobody.</strong></p>
+  <p>
+    <code>pop@gmail.com</code> and <code>shiva@gmail.com</code> can authenticate
+    but have no role, so they appear in no list and land nowhere in the app.
+    They show in an amber panel at the bottom of the page with a
+    <strong>Remove login</strong> button. If you don't recognise them, remove
+    them.
+  </p>
+</div>
+
+<h2>Also worth knowing</h2>
+
+<p>
+  You currently have <strong>seven managers</strong>, though only three can
+  sign in: <code>venkatesh@techvitta.in</code> aside, that's
+  <code>karunakarktpl@gmail.com</code>, <code>manager@gmail.com</code> and
+  <code>manager@techvitta.in</code>. A manager can list everyone in the company
+  and reset any salesperson's password, so it's worth being deliberate about who
+  holds that role.
+</p>
+
+<footer>
+  Users &amp; Access · sales.techvitta.in · reachable at <code>/access</code> as an owner
+  or <code>/manager/access</code> as a manager
+</footer>
+
+</div>
+</body>
+</html>
