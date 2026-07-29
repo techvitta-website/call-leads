@@ -43,7 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { normalizeRole, ROLE_LABEL, ADMIN_ONLY, STAFF, EVERYONE, SALES_SCOPE, type Role } from "@/lib/roles";
-import { getCurrentRole } from "@/lib/currentRole";
+import { getIdentity } from "@/lib/currentRole";
 
 interface SidebarProps {
   role?: Role | string;
@@ -182,14 +182,12 @@ const DashboardSidebar = ({ role }: SidebarProps) => {
     let cancelled = false;
 
     const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
+      // One shared lookup for both the email and the role — the route guard
+      // has usually resolved it already, so this costs nothing.
+      const me = await getIdentity();
       if (cancelled) return;
-      setUserEmail(data?.user?.email || "User");
-      if (!data?.user) return;
-
-      // Shared with the route guard, so this is usually already resolved.
-      const role = await getCurrentRole();
-      if (!cancelled) setActualRole(role);
+      setUserEmail(me?.email || "User");
+      setActualRole(me?.role ?? null);
     };
 
     fetchUser();

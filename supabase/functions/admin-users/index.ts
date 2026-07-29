@@ -67,6 +67,59 @@ function strongEnough(pw: string): string | null {
   return null;
 }
 
+/**
+ * Reject passwords that appear in known breach corpora.
+ *
+ * This is the same check as Supabase's "leaked password protection", done
+ * here because that setting lives in the dashboard. Uses the k-anonymity
+ * range API: we send the first five characters of the SHA-1 hash and get
+ * back every suffix sharing that prefix, so the password itself — and even
+ * its full hash — never leaves this function.
+ *
+ * Fails OPEN. If Have I Been Pwned is unreachable, an administrator still
+ * needs to be able to reset a locked-out colleague's password; the length,
+ * letter and digit rules above still apply. A breach check is worth having
+ * but not worth making password resets depend on a third party's uptime.
+ */
+async function seenInBreach(pw: string): Promise<boolean> {
+  try {
+    const bytes = new TextEncoder().encode(pw);
+    const digest = await crypto.subtle.digest("SHA-1", bytes);
+    const sha1 = [...new Uint8Array(digest)]
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+      .toUpperCase();
+
+    const prefix = sha1.slice(0, 5);
+    const suffix = sha1.slice(5);
+
+    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+      headers: { "Add-Padding": "true", "User-Agent": "techvitta-crm" },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return false;
+
+    const body = await res.text();
+    for (const line of body.split("\n")) {
+      const [hash, count] = line.trim().split(":");
+      // Padded responses include decoy entries with a count of zero.
+      if (hash === suffix && Number(count) > 0) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function passwordProblem(pw: string): Promise<string | null> {
+  const weak = strongEnough(pw);
+  if (weak) return weak;
+  if (await seenInBreach(pw)) {
+    return "That password has appeared in a known data breach. Pick a different one — the Suggest button generates a safe one.";
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -233,7 +286,7 @@ Deno.serve(async (req) => {
       if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
         return json({ error: "Enter a valid email address." }, 400);
       }
-      const weak = strongEnough(password);
+      const weak = await passwordProblem(password);
       if (weak) return json({ error: weak }, 400);
       if (!ROLES.includes(role)) return json({ error: "Unknown role." }, 400);
 
@@ -339,7 +392,7 @@ Deno.serve(async (req) => {
     // ── RESET PASSWORD ─────────────────────────────────────────
     if (action === "reset_password") {
       const password = String(body?.password ?? "");
-      const weak = strongEnough(password);
+      const weak = await passwordProblem(password);
       if (weak) return json({ error: weak }, 400);
 
       const { error } = await admin.auth.admin.updateUserById(targetId, { password });

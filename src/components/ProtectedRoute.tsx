@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader, ShieldAlert } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { homeFor, ROLE_LABEL, type Role } from "@/lib/roles";
-import { getCurrentRole } from "@/lib/currentRole";
+import { getIdentity } from "@/lib/currentRole";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -30,11 +29,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allow 
 
     const checkAuth = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        // One lookup covers both "are they signed in" and "what may they
+        // see", and the sidebar reuses the same cached answer. Doing these
+        // as two separate auth calls is what put four lock acquisitions on
+        // the critical path of every page load.
+        const me = await getIdentity();
 
-        if (!user) {
+        if (!me) {
           if (!cancelled) navigate("/", { replace: true });
           return;
         }
@@ -44,14 +45,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allow 
           return;
         }
 
-        // Read the role from the database rather than the token — a JWT can
-        // carry metadata from before a demotion. Shared with the sidebar and
-        // the page beneath, so this costs one request per load, not three.
-        const role = await getCurrentRole();
-
+        // The role comes from the database rather than the token — a JWT can
+        // carry metadata from before a demotion.
         if (cancelled) return;
         setState(
-          role && allow.includes(role) ? { status: "ok" } : { status: "denied", role },
+          me.role && allow.includes(me.role)
+            ? { status: "ok" }
+            : { status: "denied", role: me.role },
         );
       } catch (error) {
         console.error("Error checking authentication:", error);

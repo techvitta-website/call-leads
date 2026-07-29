@@ -125,7 +125,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables. Please check your .env.local file.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 const logSupabaseError = (context: string, error: any) => {
   if (error) {
@@ -306,14 +312,15 @@ export const getUsers = async () => {
   }
 };
 
-export const getUserById = async (id: string, forceRefresh: boolean = true) => {
+export const getUserById = async (id: string, _forceRefresh: boolean = true) => {
   try {
-    // Force fresh session if requested
-    if (forceRefresh) {
-      await supabase.auth.getSession();
-    }
-    
-    // Always fetch fresh data from database
+    // There used to be an `await supabase.auth.getSession()` here to "force a
+    // fresh session". It did nothing useful — the client refreshes the token
+    // itself and attaches it to every request — but it was actively harmful.
+    // supabase-js serialises auth calls behind a single lock, and this
+    // function runs several times per page load, nested inside other auth
+    // calls, so the page could sit on its spinner waiting for a lock that
+    // nobody was going to release.
     const { data, error } = await supabase
       .from('users')
       .select('*')
@@ -1290,10 +1297,9 @@ export const normalizeRole = (value: unknown): UserRole | null => {
  */
 export const getUserRole = async (userId: string): Promise<UserRole | null> => {
   try {
-    // Force fresh session
-    await supabase.auth.getSession();
-    
-    // Force fresh user data fetch
+    // No getSession() here either — see the note in getUserById. Between them
+    // these two calls put four auth-lock acquisitions on the critical path of
+    // every page load, which is what made the dashboard hang.
     const { data: userData, error } = await getUserById(userId, true);
     
     if (error || !userData) {
