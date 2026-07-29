@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Loader, CheckCircle, Clock, XCircle, AlertCircle, Filter, Search, Mail, Phone as PhoneIcon, Briefcase, Upload, FileSpreadsheet, UserPlus, MoreHorizontal, Edit, Trash2, ChevronDown, Download, X, StickyNote, Calendar, MessageCircle, CalendarCheck, Sparkles, ListPlus, Send } from "lucide-react";
+import { Plus, Loader, CheckCircle, Clock, XCircle, AlertCircle, Filter, Search, Mail, Phone as PhoneIcon, Briefcase, Upload, FileSpreadsheet, UserPlus, MoreHorizontal, Edit, Trash2, ChevronDown, Download, X, StickyNote, Calendar, MessageCircle, CalendarCheck, Sparkles, ListPlus, Send, MapPin } from "lucide-react";
 import AILeadGenerationDialog from "@/components/AILeadGenerationDialog";
 import AILeadScoringDialog from "@/components/AILeadScoringDialog";
 import WhatsAppSender from "@/components/WhatsAppSender";
 import WhatsAppGroupImport from "@/components/WhatsAppGroupImport";
+import DiscoverLeadsDialog from "@/components/DiscoverLeadsDialog";
 import { exportLeadsToExcel } from "@/lib/exportExcel";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { Card } from "@/components/ui/card";
@@ -283,6 +284,7 @@ const ManagerLeads = () => {
   const [showScoringDialog, setShowScoringDialog] = useState(false);
   const [aiScores, setAiScores] = useState<Record<string, number>>({});
   const [showWAGroupImport, setShowWAGroupImport] = useState(false);
+  const [showDiscover, setShowDiscover] = useState(false);
   
   // Bulk import states
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
@@ -2183,6 +2185,16 @@ const ManagerLeads = () => {
               >
                 <MessageCircle className="w-4 h-4 mr-1.5" />
                 WA Group Import
+              </Button>
+
+              <Button
+                onClick={() => setShowDiscover(true)}
+                disabled={projects.length === 0}
+                className="bg-teal-600 hover:bg-teal-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 shrink-0 whitespace-nowrap"
+                title={projects.length === 0 ? "Create a project first" : "Find real local businesses from map data"}
+              >
+                <MapPin className="w-4 h-4 mr-1.5" />
+                Find Businesses
               </Button>
 
               <div className="w-px h-6 bg-slate-200 shrink-0" />
@@ -5344,6 +5356,20 @@ const ManagerLeads = () => {
         onClose={() => setShowWhatsApp(false)}
         leads={leads.filter(l => selectedLeadIds.has(l.id))}
         mode={selectedLeadIds.size === 1 ? "single" : "bulk"}
+      />
+
+      {/* Find real local businesses from map data */}
+      <DiscoverLeadsDialog
+        open={showDiscover}
+        onClose={() => setShowDiscover(false)}
+        projects={projects}
+        defaultProjectId={selectedProject?.id}
+        salesUsers={salesUsers}
+        onImported={async (count) => {
+          const leadsRes = await import("@/lib/supabase").then(m => m.getLeads());
+          if (leadsRes?.data) setLeads(leadsRes.data as any[]);
+          setToast(`Imported ${count} lead${count !== 1 ? "s" : ""} from map data`);
+        }}
       />
 
       {/* WhatsApp Group Import */}
