@@ -32,6 +32,7 @@ import ManagerPurchaseOrders from "./pages/ManagerPurchaseOrders";
 import ManagerFollowUps from "./pages/ManagerFollowUps";
 import ManagerAutomations from "./pages/ManagerAutomations";
 import ManagerSequences from "./pages/ManagerSequences";
+import ManagerAccess from "./pages/ManagerAccess";
 import SalesMyLeads from "./pages/SalesMyLeads";
 import SalesFollowUps from "./pages/SalesFollowUps";
 import SalesPipeline from "./pages/SalesPipeline";
@@ -88,6 +89,10 @@ const App = () => (
           <Route path="/manager/follow-ups" element={<ProtectedRoute><ManagerFollowUps /></ProtectedRoute>} />
           <Route path="/manager/automations" element={<ProtectedRoute><ManagerAutomations /></ProtectedRoute>} />
           <Route path="/manager/sequences" element={<ProtectedRoute><ManagerSequences /></ProtectedRoute>} />
+          {/* Users & Access. Owners reach it here too — the page gates every
+              action on the caller's real role, so one route serves both. */}
+          <Route path="/manager/access" element={<ProtectedRoute><ManagerAccess /></ProtectedRoute>} />
+          <Route path="/access" element={<ProtectedRoute><ManagerAccess /></ProtectedRoute>} />
           <Route path="/manager/sales" element={<ProtectedRoute><ManagerSales /></ProtectedRoute>} />
           <Route path="/manager/sales-performance" element={<ProtectedRoute><ManagerSalesPerformance /></ProtectedRoute>} />
           <Route path="/manager/team" element={<ProtectedRoute><ManagerTeam /></ProtectedRoute>} />

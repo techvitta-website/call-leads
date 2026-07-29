@@ -19,6 +19,7 @@ import {
   Zap,
   Send,
   ListChecks,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ const getMenuItems = (role: "owner" | "manager" | "salesman") => {
     { icon: LineChart, label: "Analytics", path: "/analytics" },
     { icon: Briefcase, label: "Regions", path: "/regions" },
     { icon: PieChart, label: "Revenue Reports", path: "/revenue" },
+    { icon: ShieldCheck, label: "Users & Access", path: "/access" },
   ];
 
   const managerItems = [
@@ -59,7 +61,9 @@ const getMenuItems = (role: "owner" | "manager" | "salesman") => {
     { icon: ListChecks, label: "Lists & Searches", path: "/manager/lead-lists" },
     { icon: Send, label: "Sequences", path: "/manager/sequences" },
     { icon: Zap, label: "Automations", path: "/manager/automations" },
-    { icon: Award, label: "Manage Users", path: "/manager/activity" },
+    // This page is an activity log, not a user manager — it was mislabelled.
+    { icon: Award, label: "Activity Log", path: "/manager/activity" },
+    { icon: ShieldCheck, label: "Users & Access", path: "/manager/access" },
   ];
 
   const salesmanItems = [
